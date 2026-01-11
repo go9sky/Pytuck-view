@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>pytuck-view - 数据库查看器</title>
+    <link rel="stylesheet" href="/static/app.css">
+    <style>
+        /* 内联关键 CSS 以加快加载速度 */
+        #app {
+            min-height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    {% raw %}
+    <div id="app">
+        <!-- 文件选择器页面 -->
+        <div v-if="state.currentPage === 'file-selector'" class="file-selector">
+            <header class="header">
+                <h1>📊 pytuck-view</h1>
+                <p>选择一个 pytuck 数据库文件开始浏览</p>
+            </header>
+
+            <!-- 错误提示 -->
+            <div v-if="state.error" class="error">
+                ❌ {{ state.error }}
+                <button @click="state.error = null">×</button>
+            </div>
+
+            <!-- 占位符功能警告 -->
+            <div v-if="state.placeholderWarning" class="warning">
+                ⚠️ {{ state.placeholderWarning }}
+                <button @click="state.placeholderWarning = null">×</button>
+            </div>
+
+            <!-- 快速操作 -->
+            <div class="quick-actions">
+                <button @click="triggerFileDialog" class="btn btn-primary">
+                    📁 选择文件
+                </button>
+                <button @click="discoverFiles" class="btn btn-secondary" :disabled="state.loading">
+                    🔍 扫描当前目录
+                </button>
+            </div>
+
+            <!-- 最近文件 -->
+            <section v-if="state.recentFiles.length > 0" class="file-section">
+                <h2>📋 最近打开</h2>
+                <div class="file-list">
+                    <div v-for="file in state.recentFiles" :key="file.file_id"
+                         class="file-item" @click="openFile(file.path)">
+                        <div class="file-info">
+                            <div class="file-name">{{ file.name }}</div>
+                            <div class="file-path">{{ file.path }}</div>
+                            <div class="file-meta">
+                                {{ formatFileSize(file.file_size) }} • {{ formatDate(file.last_opened) }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 发现的文件 -->
+            <section v-if="state.discoveredFiles.length > 0" class="file-section">
+                <h2>📁 当前目录</h2>
+                <div class="file-list">
+                    <div v-for="file in state.discoveredFiles" :key="file.path"
+                         class="file-item" @click="openFile(file.path)">
+                        <div class="file-info">
+                            <div class="file-name">{{ file.name }}{{ file.extension }}</div>
+                            <div class="file-path">{{ file.path }}</div>
+                            <div class="file-meta">
+                                {{ formatFileSize(file.size) }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 空状态 -->
+            <div v-if="!state.loading && state.recentFiles.length === 0 && state.discoveredFiles.length === 0"
+                 class="empty-state">
+                <p>🔍 未发现 pytuck 数据库文件</p>
+                <p>支持的格式：.bin, .json, .csv</p>
+            </div>
+        </div>
+
+        <!-- 数据库查看页面 -->
+        <div v-else-if="state.currentPage === 'database-view'" class="database-view">
+            <header class="header">
+                <button @click="backToFileSelector" class="btn btn-back">← 返回</button>
+                <div class="db-info">
+                    <h1>📊 {{ state.currentDatabase.name }}</h1>
+                    <p>{{ state.currentDatabase.tables_count }} 张表 • {{ formatFileSize(state.currentDatabase.file_size) }}</p>
+                </div>
+            </header>
+
+            <!-- 占位符功能警告（数据库页面） -->
+            <div v-if="state.placeholderWarning" class="warning">
+                ⚠️ {{ state.placeholderWarning }}
+                <button @click="state.placeholderWarning = null">×</button>
+            </div>
+
+            <div class="main-content">
+                <!-- 侧边栏 - 表列表 -->
+                <aside class="sidebar">
+                    <h3>📋 数据表</h3>
+                    <div class="table-list">
+                        <div v-for="table in state.tables" :key="table"
+                             class="table-item"
+                             :class="{
+                                active: state.currentTable === table,
+                                placeholder: table.startsWith('⚠️') || table.startsWith('💡') || table.startsWith('📋')
+                             }"
+                             @click="selectTable(table)">
+                            {{ table }}
+                        </div>
+                    </div>
+                </aside>
+
+                <!-- 主内容区 -->
+                <main class="content">
+                    <div v-if="!state.currentTable" class="welcome">
+                        <h2>👈 选择一个表开始浏览</h2>
+                    </div>
+
+                    <div v-else>
+                        <!-- 表信息 -->
+                        <div v-if="state.tableSchema" class="table-info">
+                            <h2>📊 {{ state.tableSchema.table_name }}</h2>
+                            <p>{{ state.tableSchema.row_count }} 行数据</p>
+                        </div>
+
+                        <!-- 表结构 -->
+                        <div v-if="state.tableSchema && state.tableSchema.columns" class="schema">
+                            <h3>🔧 表结构</h3>
+                            <div class="columns">
+                                <div v-for="col in state.tableSchema.columns" :key="col.name" class="column">
+                                    <span class="col-name">{{ col.name }}</span>
+                                    <span class="col-type">{{ col.type }}</span>
+                                    <span v-if="col.primary_key" class="col-pk">🔑</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 数据表格 -->
+                        <div v-if="hasData" class="data-table">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th v-for="col in state.tableSchema.columns" :key="col.name"
+                                            @click="sortTable(col.name)"
+                                            class="sortable">
+                                            {{ col.name }}
+                                            <span v-if="state.sortBy === col.name">
+                                                <span v-if="state.sortOrder === 'asc'">↑</span>
+                                                <span v-else>↓</span>
+                                            </span>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="(row, index) in state.tableData" :key="index">
+                                        <td v-for="col in state.tableSchema.columns" :key="col.name">
+                                            {{ row[col.name] }}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- 分页 -->
+                        <div v-if="totalPages > 1" class="pagination">
+                            <button @click="goToPage(1)" :disabled="state.currentPageNum === 1">首页</button>
+                            <button @click="goToPage(state.currentPageNum - 1)" :disabled="state.currentPageNum === 1">上一页</button>
+                            <span>第 {{ state.currentPageNum }} / {{ totalPages }} 页</span>
+                            <button @click="goToPage(state.currentPageNum + 1)" :disabled="state.currentPageNum === totalPages">下一页</button>
+                            <button @click="goToPage(totalPages)" :disabled="state.currentPageNum === totalPages">尾页</button>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+
+        <!-- 全局加载状态 -->
+        <div v-if="state.loading" class="loading-overlay">
+            <div class="loading">加载中...</div>
+        </div>
+    </div>
+    {% endraw %}
+
+    <!-- Vue.js 3.x 本地文件 -->
+    <script src="/static/vue.min.js"></script>
+
+    <script>
+        const { createApp, ref, reactive, computed, onMounted, nextTick } = Vue;
+
+        createApp({
+            setup() {
+                // 响应式数据
+                const state = reactive({
+                    currentPage: 'file-selector', // 'file-selector', 'database-view'
+                    recentFiles: [],
+                    discoveredFiles: [],
+                    currentDatabase: null,
+                    tables: [],
+                    currentTable: null,
+                    tableSchema: null,
+                    tableData: [],
+                    currentPageNum: 1,
+                    totalRows: 0,
+                    rowsPerPage: 50,
+                    loading: false,
+                    error: null,
+                    placeholderWarning: null,  // 新增：占位符功能警告
+                    sortBy: null,
+                    sortOrder: 'asc'
+                });
+
+                // 计算属性
+                const totalPages = computed(() => {
+                    return Math.ceil(state.totalRows / state.rowsPerPage);
+                });
+
+                const hasData = computed(() => {
+                    return state.tableData && state.tableData.length > 0;
+                });
+
+                // API 调用封装 - 处理新的 {code, msg, data} 格式
+                async function api(path, options = {}) {
+                    try {
+                        const response = await fetch(`/api${path}`, {
+                            headers: {
+                                'Content-Type': 'application/json',
+                                ...options.headers
+                            },
+                            ...options
+                        });
+
+                        const result = await response.json();
+
+                        // 处理新的 {code, msg, data} 格式
+                        if (result.code !== undefined) {
+                            if (result.code !== 200) {
+                                throw new Error(result.msg || `错误代码: ${result.code}`);
+                            }
+
+                            // 检查是否有占位符功能的警告
+                            if (result.msg && (result.msg.includes('暂不可用') || result.msg.includes('需要') || result.msg.includes('占位符'))) {
+                                state.placeholderWarning = result.msg;
+                            }
+
+                            return result.data;
+                        } else if (!response.ok) {
+                            // 兼容老格式
+                            throw new Error(result.detail || `HTTP ${response.status}`);
+                        }
+
+                        return result;
+                    } catch (error) {
+                        console.error('API 错误:', error);
+                        state.error = error.message;
+                        throw error;
+                    }
+                }
+
+                // 加载最近文件
+                async function loadRecentFiles() {
+                    try {
+                        state.loading = true;
+                        const data = await api('/recent-files');
+                        state.recentFiles = data.files || [];
+                    } catch (error) {
+                        console.error('加载最近文件失败:', error);
+                    } finally {
+                        state.loading = false;
+                    }
+                }
+
+                // 发现当前目录文件
+                async function discoverFiles() {
+                    try {
+                        state.loading = true;
+                        const data = await api('/discover-files');
+                        state.discoveredFiles = data.files || [];
+                    } catch (error) {
+                        console.error('发现文件失败:', error);
+                    } finally {
+                        state.loading = false;
+                    }
+                }
+
+                // 打开文件
+                async function openFile(filePath) {
+                    try {
+                        state.loading = true;
+                        state.error = null;
+                        state.placeholderWarning = null;
+
+                        const data = await api('/open-file', {
+                            method: 'POST',
+                            body: JSON.stringify({ path: filePath })
+                        });
+
+                        state.currentDatabase = data;
+                        state.currentPage = 'database-view';
+
+                        // 立即加载表列表
+                        await loadTables();
+
+                    } catch (error) {
+                        state.error = `打开文件失败: ${error.message}`;
+                    } finally {
+                        state.loading = false;
+                    }
+                }
+
+                // 加载表列表
+                async function loadTables() {
+                    if (!state.currentDatabase) return;
+
+                    try {
+                        const data = await api(`/tables/${state.currentDatabase.file_id}`);
+                        state.tables = data.tables || [];
+
+                        // 检查是否有占位符表
+                        if (data.has_placeholder) {
+                            state.placeholderWarning = '部分功能需要 pytuck 库支持，表列表可能不完整';
+                        }
+                    } catch (error) {
+                        console.error('加载表列表失败:', error);
+                    }
+                }
+
+                // 选择表
+                async function selectTable(tableName) {
+                    try {
+                        state.loading = true;
+                        state.currentTable = tableName;
+                        state.currentPageNum = 1;
+
+                        // 并行加载表结构和数据
+                        await Promise.all([
+                            loadTableSchema(tableName),
+                            loadTableData(tableName, 1)
+                        ]);
+
+                    } catch (error) {
+                        state.error = `加载表数据失败: ${error.message}`;
+                    } finally {
+                        state.loading = false;
+                    }
+                }
+
+                // 加载表结构
+                async function loadTableSchema(tableName) {
+                    if (!state.currentDatabase) return;
+
+                    const data = await api(`/schema/${state.currentDatabase.file_id}/${tableName}`);
+                    state.tableSchema = data;
+
+                    // 检查是否有占位符列
+                    if (data.columns && data.columns.some(col => col.name && col.name.startsWith('⚠️'))) {
+                        state.placeholderWarning = '表结构功能需要 pytuck 库完善，列信息可能不准确';
+                    }
+                }
+
+                // 加载表数据
+                async function loadTableData(tableName, page = 1) {
+                    if (!state.currentDatabase) return;
+
+                    const params = new URLSearchParams({
+                        page: page.toString(),
+                        limit: state.rowsPerPage.toString()
+                    });
+
+                    if (state.sortBy) {
+                        params.append('sort', state.sortBy);
+                        params.append('order', state.sortOrder);
+                    }
+
+                    const data = await api(
+                        `/rows/${state.currentDatabase.file_id}/${tableName}?${params}`
+                    );
+
+                    state.tableData = data.rows || [];
+                    state.totalRows = data.total || 0;
+                    state.currentPageNum = data.page || 1;
+
+                    // 检查是否是占位符数据
+                    if (data.rows && data.rows.length > 0 &&
+                        data.rows[0].message && data.rows[0].message.includes('⚠️')) {
+                        state.placeholderWarning = '数据查询功能暂不可用，需要 pytuck 库支持';
+                    }
+                }
+
+                // 排序
+                async function sortTable(columnName) {
+                    if (state.sortBy === columnName) {
+                        state.sortOrder = state.sortOrder === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        state.sortBy = columnName;
+                        state.sortOrder = 'asc';
+                    }
+
+                    if (state.currentTable) {
+                        await loadTableData(state.currentTable, state.currentPageNum);
+                    }
+                }
+
+                // 分页
+                async function goToPage(page) {
+                    if (page < 1 || page > totalPages.value || !state.currentTable) return;
+
+                    await loadTableData(state.currentTable, page);
+                }
+
+                // 返回文件选择页面
+                function backToFileSelector() {
+                    state.currentPage = 'file-selector';
+                    state.currentDatabase = null;
+                    state.tables = [];
+                    state.currentTable = null;
+                    state.tableSchema = null;
+                    state.tableData = [];
+                }
+
+                // 格式化文件大小
+                function formatFileSize(bytes) {
+                    if (bytes === 0) return '0 B';
+                    const k = 1024;
+                    const sizes = ['B', 'KB', 'MB', 'GB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+                }
+
+                // 格式化日期
+                function formatDate(isoString) {
+                    const date = new Date(isoString);
+                    return date.toLocaleString('zh-CN');
+                }
+
+                // 触发文件选择对话框
+                function triggerFileDialog() {
+                    alert('文件选择功能需要在桌面环境中运行。请直接将文件拖拽到当前目录，然后点击"扫描当前目录"。');
+                }
+
+                // 初始化
+                onMounted(async () => {
+                    await Promise.all([
+                        loadRecentFiles(),
+                        discoverFiles()
+                    ]);
+                });
+
+                return {
+                    state,
+                    totalPages,
+                    hasData,
+                    openFile,
+                    selectTable,
+                    sortTable,
+                    goToPage,
+                    backToFileSelector,
+                    triggerFileDialog,
+                    formatFileSize,
+                    formatDate,
+                    loadRecentFiles,
+                    discoverFiles
+                };
+            }
+        }).mount('#app');
+    </script>
+
+</body>
+</html>
