@@ -389,8 +389,7 @@
                     state.currentPageNum = data.page || 1;
 
                     // 检查是否是占位符数据
-                    if (data.rows && data.rows.length > 0 &&
-                        data.rows[0].message && data.rows[0].message.includes('⚠️')) {
+                    if (data.rows && data.rows.length > 0 && data.rows[0].is_placeholder) {
                         state.placeholderWarning = '数据查询功能暂不可用，需要 pytuck 库支持';
                     }
                 }
