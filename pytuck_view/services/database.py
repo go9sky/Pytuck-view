@@ -219,58 +219,111 @@ class DatabaseService:
         }]
 
     def get_table_data(self, table_name: str, page: int = 1, limit: int = 50,
-                       sort_by: Optional[str] = None, order: str = 'asc') -> Dict[str, Any]:
-        """获取表数据（分页）"""
+                       sort_by: Optional[str] = None, order: str = 'asc',
+                       filters: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+        """获取表数据（支持服务端分页和过滤）"""
         if not self.storage:
             raise RuntimeError("数据库未打开")
 
         # 如果是占位符表名，返回占位符数据
         if table_name.startswith(('⚠️', '💡', '📋')):
             return {
-                "rows": [{"message": "这是一个功能提示，实际数据需要 pytuck 库支持"}],
+                "rows": [{"message": "这是一个功能提示，实际数据需要 pytuck 库支持", "is_placeholder": True}],
                 "total": 1,
                 "page": page,
-                "limit": limit
+                "limit": limit,
+                "server_side": False
             }
 
         try:
             # 计算偏移量
             offset = (page - 1) * limit
+            server_side = False
 
-            # 尝试查询数据
+            # 优先尝试服务端分页
+            if self.supports_server_side_pagination():
+                try:
+                    # 尝试调用 storage.query_table_data
+                    order_desc = order.lower() == 'desc'
+                    result = self.storage.query_table_data(
+                        table_name=table_name,
+                        limit=limit,
+                        offset=offset,
+                        order_by=sort_by,
+                        order_desc=order_desc,
+                        filters=filters
+                    )
+
+                    # 解析返回结果
+                    rows = []
+                    total = 0
+                    if isinstance(result, tuple) and len(result) >= 2:
+                        # 返回 (rows, total) 格式
+                        rows, total = result[:2]
+                    elif isinstance(result, dict):
+                        # 返回字典格式
+                        rows = result.get('records', result.get('rows', []))
+                        total = result.get('total_count', result.get('total', len(rows)))
+                    else:
+                        # 其他情况，假设返回行列表
+                        rows = list(result) if result else []
+                        total = len(rows)
+
+                    # 序列化数据
+                    serialized_rows = []
+                    for row in rows:
+                        serialized_rows.append(self._serialize_value(row))
+
+                    server_side = True
+                    print(f"使用服务端分页查询 {table_name}，返回 {len(serialized_rows)} 行，总计 {total} 行")
+
+                    return {
+                        "rows": serialized_rows,
+                        "total": total,
+                        "page": page,
+                        "limit": limit,
+                        "server_side": True
+                    }
+
+                except Exception as e:
+                    print(f"服务端分页查询失败，降级到内存分页: {e}")
+
+            # 降级到内存分页和过滤
             rows = []
             total = 0
 
             if hasattr(self.storage, 'query'):
-                # 尝试使用 storage.query 方法
+                # 使用 storage.query 方法获取全量数据
                 try:
                     all_rows = self.storage.query(table_name, conditions=None)
-                    total = len(all_rows) if all_rows else 0
-
                     if all_rows:
-                        # 将查询结果转换为纯字典格式，确保可以序列化为 JSON
+                        # 序列化数据
                         serializable_rows = []
                         for row in all_rows:
                             if hasattr(row, '__dict__'):
-                                # 如果是对象，转换为字典
+                                # 对象转字典
                                 row_dict = {}
                                 for key, value in row.__dict__.items():
-                                    # 跳过私有属性和方法
                                     if not key.startswith('_') and not callable(value):
                                         row_dict[key] = self._serialize_value(value)
                                 serializable_rows.append(row_dict)
                             elif isinstance(row, dict):
-                                # 如果已经是字典，清理不可序列化的值
+                                # 清理不可序列化的值
                                 clean_dict = {}
                                 for key, value in row.items():
                                     if not callable(value):
                                         clean_dict[key] = self._serialize_value(value)
                                 serializable_rows.append(clean_dict)
                             else:
-                                # 其他情况，转换为字符串表示
                                 serializable_rows.append({"data": str(row)})
 
-                        # 简单排序
+                        # 应用过滤条件
+                        if filters:
+                            serializable_rows = self._apply_filters(serializable_rows, filters)
+
+                        total = len(serializable_rows)
+
+                        # 排序
                         if sort_by and serializable_rows:
                             reverse_order = order.lower() == 'desc'
                             try:
@@ -279,24 +332,26 @@ class DatabaseService:
                                     reverse=reverse_order
                                 )
                             except (TypeError, KeyError):
-                                # 如果排序失败，保持原顺序
+                                # 排序失败，保持原顺序
                                 pass
 
                         # 分页
                         rows = serializable_rows[offset:offset + limit]
                     else:
                         rows = []
+                        total = 0
 
                 except Exception as e:
                     print(f"查询数据失败: {e}")
                     rows = []
                     total = 0
+
             else:
-                # 如果没有 query 方法，尝试直接访问表数据
+                # 尝试直接访问表数据
                 try:
                     table = self.storage.get_table(table_name)
                     if table:
-                        # 尝试获取数据
+                        # 获取表数据
                         table_data = None
                         if hasattr(table, 'records'):
                             table_data = table.records
@@ -309,6 +364,10 @@ class DatabaseService:
                             for row in table_data:
                                 clean_row = self._serialize_value(row)
                                 serializable_rows.append(clean_row)
+
+                            # 应用过滤条件
+                            if filters:
+                                serializable_rows = self._apply_filters(serializable_rows, filters)
 
                             total = len(serializable_rows)
 
@@ -336,16 +395,22 @@ class DatabaseService:
                     rows = []
                     total = 0
 
-            # 如果查询失败或没有数据，返回占位符
+            # 如果没有数据，返回占位符
             if not rows:
-                rows = self._get_placeholder_data()
-                total = 1
+                return {
+                    "rows": self._get_placeholder_data(),
+                    "total": 1,
+                    "page": page,
+                    "limit": limit,
+                    "server_side": False
+                }
 
             return {
                 "rows": rows,
                 "total": total,
                 "page": page,
-                "limit": limit
+                "limit": limit,
+                "server_side": server_side
             }
 
         except Exception as e:
@@ -354,7 +419,8 @@ class DatabaseService:
                 "rows": self._get_placeholder_data(),
                 "total": 1,
                 "page": page,
-                "limit": limit
+                "limit": limit,
+                "server_side": False
             }
 
     def _serialize_value(self, value) -> Any:
@@ -381,14 +447,111 @@ class DatabaseService:
             except:
                 return "unknown"
 
+    def _apply_filters(self, rows: List[Dict[str, Any]], filters: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """在内存中应用过滤条件"""
+        if not filters or not rows:
+            return rows
+
+        filtered_rows = []
+        for row in rows:
+            matches = True
+            for filter_def in filters:
+                field = filter_def.get('field')
+                op = filter_def.get('op', 'eq')
+                value = filter_def.get('value')
+
+                if field not in row:
+                    matches = False
+                    break
+
+                row_value = row[field]
+                try:
+                    if op == 'eq':
+                        matches = row_value == value
+                    elif op == 'gt':
+                        matches = float(row_value) > float(value)
+                    elif op == 'gte':
+                        matches = float(row_value) >= float(value)
+                    elif op == 'lt':
+                        matches = float(row_value) < float(value)
+                    elif op == 'lte':
+                        matches = float(row_value) <= float(value)
+                    elif op == 'contains':
+                        matches = str(value).lower() in str(row_value).lower()
+                    elif op == 'in':
+                        matches = row_value in value if isinstance(value, list) else row_value == value
+                    else:
+                        matches = True  # 未知操作符，不过滤
+                except (ValueError, TypeError):
+                    matches = False  # 类型转换失败，视为不匹配
+
+                if not matches:
+                    break
+
+            if matches:
+                filtered_rows.append(row)
+
+        return filtered_rows
+
     def _get_placeholder_data(self) -> List[Dict[str, Any]]:
         """返回占位符数据"""
         return [{
             "id": 1,
             "message": "⚠️ 数据查询功能暂不可用",
             "suggestion": "需要在 pytuck 库中完善数据查询接口",
-            "methods_needed": "storage.query() 或 session.execute(select())"
+            "methods_needed": "storage.query() 或 session.execute(select())",
+            "is_placeholder": True
         }]
+
+    def supports_server_side_pagination(self) -> bool:
+        """检测 storage 或 storage.backend 是否支持服务器端分页"""
+        if not self.storage:
+            return False
+
+        # 优先查找明确的 query_table_data 方法
+        if hasattr(self.storage, 'query_table_data'):
+            return True
+
+        # 检查 backend 是否声明支持服务器端分页
+        backend = getattr(self.storage, 'backend', None)
+        if backend:
+            # 若 backend 有方法 supports_server_side_pagination
+            attr = getattr(backend, 'supports_server_side_pagination', None)
+            if callable(attr):
+                try:
+                    return bool(attr())
+                except Exception:
+                    return False
+            elif isinstance(attr, bool):
+                return attr
+
+        return False
+
+    def get_capabilities(self) -> Dict[str, Any]:
+        """获取数据库后端的能力信息"""
+        if not self.storage:
+            return {
+                "server_side_pagination": False,
+                "supports_filters": False,
+                "backend_name": "unknown",
+                "status": "not_connected"
+            }
+
+        try:
+            return {
+                "server_side_pagination": self.supports_server_side_pagination(),
+                "supports_filters": hasattr(self.storage, 'query_table_data'),
+                "backend_name": getattr(self.storage, 'engine', 'unknown'),
+                "status": "connected"
+            }
+        except Exception as e:
+            return {
+                "server_side_pagination": False,
+                "supports_filters": False,
+                "backend_name": "unknown",
+                "status": "error",
+                "error": str(e)
+            }
 
     def close(self):
         """关闭数据库连接"""
@@ -413,12 +576,16 @@ class DatabaseService:
             # 过滤掉占位符表名
             real_tables = [t for t in tables if not t.startswith(('⚠️', '💡', '📋'))]
 
+            # 获取能力信息
+            capabilities = self.get_capabilities()
+
             return {
                 "file_path": self.file_path,
                 "file_size": os.path.getsize(self.file_path) if self.file_path else 0,
                 "tables_count": len(real_tables),
                 "engine": getattr(self.storage, 'engine', 'unknown'),
-                "status": "connected"
+                "status": "connected",
+                "capabilities": capabilities
             }
         except Exception as e:
             return {

@@ -6,10 +6,11 @@ API 路由模块
 统一返回格式: {code: 状态码, msg: 消息, data: 数据}
 """
 
+import asyncio
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from ..services.file_manager import file_manager, FileRecord
@@ -22,11 +23,78 @@ router = APIRouter()
 # 全局数据库服务实例字典（按 file_id 存储）
 db_services: Dict[str, DatabaseService] = {}
 
+# 全局当前文件 ID（用于兼容性端点）
+current_file_id: Optional[str] = None
+_current_file_lock = asyncio.Lock()
+
 
 # Pydantic 模型
 class OpenFileRequest(BaseModel):
     """打开文件请求模型"""
     path: str
+
+
+# 辅助函数
+def guess_type(s: str):
+    """尝试推断字符串的数据类型"""
+    if not s:
+        return s
+
+    # 尝试转换为数字
+    try:
+        return int(s)
+    except ValueError:
+        pass
+
+    try:
+        return float(s)
+    except ValueError:
+        pass
+
+    # 尝试转换为布尔值
+    lower = s.lower()
+    if lower in ('true', 'false'):
+        return lower == 'true'
+
+    return s
+
+
+def parse_filter_params(query_params: Dict[str, str]) -> List[Dict[str, Any]]:
+    """解析 filter_* 查询参数"""
+    filters = []
+    supported_ops = {'eq', 'gt', 'gte', 'lt', 'lte', 'contains', 'in'}
+
+    for k, v in query_params.items():
+        if not k.startswith('filter_'):
+            continue
+
+        # 解析参数名: filter_field 或 filter_field__op
+        _, rest = k.split('filter_', 1)
+        if '__' in rest:
+            field, op = rest.split('__', 1)
+        else:
+            field, op = rest, 'eq'
+
+        # 验证操作符
+        if op not in supported_ops:
+            op = 'eq'
+
+        # 解析值
+        value = v
+        if op == 'in':
+            # 处理 in 操作符，按逗号分割
+            values = [guess_type(x.strip()) for x in v.split(',') if x.strip()]
+            value = values
+        else:
+            value = guess_type(v)
+
+        filters.append({
+            "field": field,
+            "op": op,
+            "value": value
+        })
+
+    return filters
 
 
 # 统一响应格式
@@ -179,35 +247,53 @@ async def get_table_schema(file_id: str, table_name: str):
 async def get_table_rows(
     file_id: str,
     table_name: str,
+    request: Request,
     page: int = Query(1, ge=1, description="页码，从 1 开始"),
     limit: int = Query(50, ge=1, le=1000, description="每页行数，最大 1000"),
     sort: Optional[str] = Query(None, description="排序字段"),
     order: str = Query("asc", pattern="^(asc|desc)$", description="排序方向")
 ):
-    """获取表数据（分页）"""
+    """获取表数据（分页，支持过滤）"""
     if file_id not in db_services:
         return error_response(code=404, msg="数据库文件未打开")
 
     try:
+        # 解析过滤参数
+        filters = parse_filter_params(dict(request.query_params))
+
         db_service = db_services[file_id]
         data = db_service.get_table_data(
             table_name=table_name,
             page=page,
             limit=limit,
             sort_by=sort,
-            order=order
+            order=order,
+            filters=filters
         )
 
         # 检查是否是占位符数据
-        if (data.get("rows") and len(data["rows"]) > 0 and
+        is_placeholder = (
+            data.get("rows") and len(data["rows"]) > 0 and
             isinstance(data["rows"][0], dict) and
-            "⚠️" in str(data["rows"][0].get("message", ""))):
+            data["rows"][0].get("is_placeholder", False)
+        )
+
+        if is_placeholder:
             return success_response(
                 data=data,
                 msg="数据查询功能暂不可用，需要 pytuck 库支持"
             )
         else:
-            return success_response(data=data, msg="表数据获取成功")
+            msg = "表数据获取成功"
+            if data.get("server_side"):
+                msg += "（使用服务端分页）"
+            else:
+                msg += "（使用内存分页）"
+
+            if filters:
+                msg += f"，应用了 {len(filters)} 个过滤条件"
+
+            return success_response(data=data, msg=msg)
 
     except Exception as e:
         return error_response(code=500, msg=f"获取表数据失败: {str(e)}")
@@ -222,6 +308,12 @@ async def close_file(file_id: str):
             db_services[file_id].close()
             del db_services[file_id]
 
+        # 清理全局 current_file_id
+        async with _current_file_lock:
+            global current_file_id
+            if current_file_id == file_id:
+                current_file_id = None
+
         # 从文件管理器中移除
         file_manager.close_file(file_id)
 
@@ -229,6 +321,22 @@ async def close_file(file_id: str):
 
     except Exception as e:
         return error_response(code=500, msg=f"关闭文件失败: {str(e)}")
+
+
+@router.post("/use-file/{file_id}")
+async def use_file(file_id: str):
+    """设置当前操作的数据库文件（用于兼容性端点）"""
+    if file_id not in db_services:
+        return error_response(code=404, msg="数据库文件未打开")
+
+    async with _current_file_lock:
+        global current_file_id
+        current_file_id = file_id
+
+    return success_response(
+        data={"file_id": file_id},
+        msg="设置当前数据库成功"
+    )
 
 
 @router.get("/database-info/{file_id}")
@@ -260,3 +368,185 @@ async def get_status():
         "status": "running"
     }
     return success_response(data=data, msg="服务状态正常")
+
+
+# ====================== 集成文档兼容性端点 ======================
+
+@router.post("/database/open")
+async def database_open(request: OpenFileRequest):
+    """打开数据库文件（集成文档兼容接口）"""
+    try:
+        # 使用现有的 open_file 逻辑
+        file_record = file_manager.open_file(request.path)
+        if not file_record:
+            raise HTTPException(status_code=404, detail="无法打开文件")
+
+        # 创建数据库服务实例
+        db_service = DatabaseService()
+        success = db_service.open_database(request.path)
+
+        if not success:
+            raise HTTPException(status_code=500, detail="数据库打开失败")
+
+        # 保存数据库服务实例
+        db_services[file_record.file_id] = db_service
+
+        # 设置为当前数据库
+        async with _current_file_lock:
+            global current_file_id
+            current_file_id = file_record.file_id
+
+        # 获取表数量信息
+        try:
+            tables = db_service.list_tables()
+            real_tables = [t for t in tables if not t.startswith(('⚠️', '💡', '📋'))]
+            tables_count = len(real_tables)
+        except:
+            tables_count = 0
+
+        # 返回集成文档期望格式
+        return {
+            "file_id": file_record.file_id,
+            "name": file_record.name,
+            "path": file_record.path,
+            "tables_count": tables_count,
+            "file_size": file_record.file_size,
+            "status": "connected"
+        }
+
+    except HTTPException:
+        raise
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"打开文件失败: {str(e)}")
+
+
+async def get_current_file_id() -> str:
+    """获取当前文件 ID，如果未设置则尝试推断"""
+    async with _current_file_lock:
+        fid = current_file_id
+
+    if not fid:
+        if len(db_services) == 1:
+            # 只有一个打开的数据库，使用它
+            fid = next(iter(db_services.keys()))
+        else:
+            # 多个或无打开的数据库
+            if len(db_services) == 0:
+                raise HTTPException(status_code=400, detail="没有打开的数据库文件，请先调用 /api/database/open")
+            else:
+                raise HTTPException(status_code=400, detail="存在多个打开数据库，请调用 /api/use-file/{file_id} 设置当前数据库")
+
+    if fid not in db_services:
+        raise HTTPException(status_code=404, detail="当前数据库文件未找到")
+
+    return fid
+
+
+@router.get("/tables")
+async def get_tables_compat():
+    """获取当前数据库的表列表（兼容性端点）"""
+    try:
+        file_id = await get_current_file_id()
+        db_service = db_services[file_id]
+        tables = db_service.list_tables()
+
+        # 过滤掉占位符表
+        real_tables = [t for t in tables if not t.startswith(('⚠️', '💡', '📋'))]
+
+        # 返回集成文档格式
+        return {
+            "tables": real_tables,
+            "total_count": len(real_tables)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取表列表失败: {str(e)}")
+
+
+@router.get("/tables/{table_name}/schema")
+async def get_table_schema_compat(table_name: str):
+    """获取表结构（兼容性端点）"""
+    try:
+        file_id = await get_current_file_id()
+        db_service = db_services[file_id]
+        table_info = db_service.get_table_info(table_name)
+
+        if not table_info:
+            raise HTTPException(status_code=404, detail=f"表 '{table_name}' 不存在")
+
+        # 返回集成文档格式
+        return {
+            "name": table_info.name,
+            "comment": "",  # pytuck 中暂无注释支持
+            "primary_key": None,  # 可以从 columns 中推断
+            "record_count": table_info.row_count,
+            "columns": table_info.columns
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取表结构失败: {str(e)}")
+
+
+@router.get("/tables/{table_name}/data")
+async def get_table_data_compat(
+    table_name: str,
+    request: Request,
+    limit: int = Query(50, ge=1, le=1000, description="每页行数"),
+    offset: int = Query(0, ge=0, description="偏移量"),
+    order_by: Optional[str] = Query(None, description="排序字段"),
+    order_desc: bool = Query(False, description="是否降序")
+):
+    """获取表数据（兼容性端点）"""
+    try:
+        file_id = await get_current_file_id()
+        db_service = db_services[file_id]
+
+        # 解析过滤参数
+        filters = parse_filter_params(dict(request.query_params))
+
+        # 计算页码
+        page = (offset // limit) + 1
+
+        # 调用数据库服务
+        data = db_service.get_table_data(
+            table_name=table_name,
+            page=page,
+            limit=limit,
+            sort_by=order_by,
+            order=("desc" if order_desc else "asc"),
+            filters=filters
+        )
+
+        # 获取表结构用于返回 schema
+        table_info = db_service.get_table_info(table_name)
+        schema = table_info.columns if table_info else []
+
+        # 返回集成文档格式
+        total_pages = (data["total"] + limit - 1) // limit
+        current_page = page
+
+        return {
+            "data": data["rows"],
+            "pagination": {
+                "page": current_page,
+                "per_page": limit,
+                "total_records": data["total"],
+                "total_pages": total_pages,
+                "has_next": current_page < total_pages,
+                "has_prev": current_page > 1
+            },
+            "schema": schema
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取表数据失败: {str(e)}")
