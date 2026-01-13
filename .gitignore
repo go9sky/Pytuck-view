@@ -12,6 +12,7 @@ env.bak/
 *.sqlite
 *.zip
 nul
+temp/
 temp_*
 .pytuck-view/
 databases/
