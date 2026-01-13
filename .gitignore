@@ -1,3 +1,16 @@
 .idea
 .venv
 *.json
+*.bin
+__pycache__/
+*.pyc
+.DS_Store
+.vscode/
+env/
+env.bak/
+*.log
+*.sqlite
+*.zip
+nul
+temp_*
+.pytuck-view/
