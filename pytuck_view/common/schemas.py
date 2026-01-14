@@ -25,3 +25,11 @@ class I18nMessage(BaseModel):
             return template.format(**kwargs)
         except KeyError:
             return template
+
+
+class ContextInfo(BaseModel):
+    """
+    数据模型：上下文信息
+    - 描述当前请求的上下文信息
+    """
+    language: str = Field(..., description="当前语言")
