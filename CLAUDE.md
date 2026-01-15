@@ -17,8 +17,9 @@
 | 模板 | Jinja2 | 随 FastAPI 间接依赖 | 语法熟悉、可内嵌 |
 | 前端 | vue.min.js | 3.x 单文件落盘 | 体积小、响应式、与“view”谐音 |
 | UI 框架 | 无 | 原生 HTML + 少量 CSS | 避免打包体积爆炸 |
-| 代码风格 | Black + isort | 默认线长 88 | 提交前 `make fmt` |
-| 最低 Python | 3.8 | 兼容多数系统自带 |
+| 代码风格 | ruff | formatter + linter（统一入口） | 提交前 `make fmt` |
+| 类型检查 | mypy | strict（CI 门禁） | 关键边界类型覆盖，降低回归风险 |
+| 最低 Python | 3.12+ | 与 pyproject.toml 一致 | 使用 3.12 typing 改进 |
 
 ## 目录规范
 ```
@@ -39,6 +40,10 @@ pytuck_view/
 ```bash
 # 开发热重载
 uvicorn pytuck_view.app:create_app --factory --reload --port 0
+
+# 本地质量门禁（建议提交前运行；CI 会强制）
+make fmt      # ruff format
+make check    # ruff check + mypy(strict) + pytest
 
 # 一键打包
 make zipapp   # 生成 dist/pytuck-view.pyz
@@ -64,14 +69,18 @@ make exe      # nuitka --onefile，生成 dist/pytuck-view.exe
 - 独立 exe ≤ 10 MB；
 - PR 若增加 > 100 KB，CI 自动贴体积 diff 并 require review。
 
+补充说明：
+- ruff/mypy/pytest 属于 dev-only 工具，不应进入运行时依赖与打包产物体积核算；但 CI 与本地开发必须执行它们作为质量门禁。
+- 新增运行时依赖或新增/扩大 vendor、static 内容 > 50 KB，必须在 PR 描述写明理由与体积影响。
+
 ## 兼容性承诺
 - 支持 pytuck 最新两个小版本；
 - 浏览器支持 Chromium 70+（Win10 自带 Edge）、Firefox 63+；
 - 不依赖浏览器插件、不依赖 ES2020 以后语法。
 
 ## 发布流程
-1. 版本号跟随 **日历月**：`25.1.0`（2025 年 1 月），bugfix 第三位递增。
-2. tag 即发布：git push origin 25.1.0 → GitHub Action 自动 build wheel / exe → PyPI。
+1. 版本号使用 `major.minor.patch` 语义，`patch` 递增。
+2. tag 即发布：git push origin 0.1.0 → GitHub Action 自动 build wheel / exe → PyPI。
 3. 写 Release Notes ≤ 3 行：新增、修复、体积变化。
 
 ## 禁止清单
@@ -80,11 +89,32 @@ make exe      # nuitka --onefile，生成 dist/pytuck-view.exe
 - ❌ 不在前端调用外部 CDN（vue.min.js 必须随包）。
 - ❌ 不增加账号、登录、权限、多语言、主题切换等任何“可配置”功能。
 - ❌ 不在主包 import 时执行耗时逻辑（连 DB 等），延迟到首次请求。
+- ❌ 不将 ruff/mypy/pytest 等 dev-only 工具作为运行时依赖（不得进入 wheel/exe 的依赖链）。
+- ❌ 不在运行时自动触发静态检查（ruff/mypy）或写入任何日志文件（调试输出仅限显式开启）。
 
 ## Claude-Code 助手要求
 - **始终使用中文回答**：与用户的所有交互、代码注释、文档说明均使用中文。
 - **技术术语适度保留英文**：如 FastAPI、JSON、HTTP、Vue.js 等可保持英文，但解释说明用中文。
 - **代码注释中文化**：Python 代码中的注释、文档字符串使用中文编写。
+
+## Python 3.12+ 通用开发规范（项目版）
+
+本章是 `python3.12项目开发通用规范.md` 的项目落地子集：在**不增加运行时复杂度与体积**的前提下，提高类型安全、边界清晰与可维护性。
+
+### MUST（强制）
+1. **单向依赖，禁止循环引用**：底层模块不得反向 import API/app 层。
+2. **结构化数据**：API 输入/输出必须使用 Pydantic 模型表达；禁止在业务逻辑中传播“裸 dict”。
+3. **类型门禁**：CI 必须通过 `mypy --strict`（以项目配置为准）。
+4. **风格门禁**：CI 必须通过 `ruff format` 与 `ruff check`。
+5. **Pathlib 统一**：新增代码禁止使用 `os.path` 拼接。
+6. **异常边界**：内部抛项目异常，API 层统一转换为 `{"detail": "人类可读原因"}`。
+
+### SHOULD（建议）
+1. 公共契约（异常、类型别名、schema 基类）集中在公共模块，避免散落。
+2. 测试使用 pytest，必须离线可跑，不依赖外部服务。
+
+### MAY（可选）
+1. 对特别复杂的结构可做 DTO/Schema 分层（内部 DTO 与 API Schema 分离）。
 
 ## 一句话自检
 每次 commit 前问自己：
