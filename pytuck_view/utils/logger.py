@@ -5,17 +5,16 @@
 - 不留日志：只输出到控制台，绝不写入磁盘文件
 - 保持简洁：默认输出简洁，通过环境变量开启详细模式
 """
+
 import logging
 import os
 import sys
-from typing import Optional
-
 
 DEFAULT_LEVEL = logging.INFO
 DEBUG_ENV = "PYTUCK_VIEW_DEBUG"
 
 
-def init_logging(verbosity: Optional[int] = None) -> None:
+def init_logging(verbosity: int | None = None) -> None:
     """
     初始化全局 logging 配置。应在程序入口尽早调用（例如 __main__）。
 

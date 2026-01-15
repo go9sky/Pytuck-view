@@ -1,6 +1,7 @@
 """
 基础数据模型
 """
+
 from pydantic import BaseModel, Field
 
 
@@ -11,6 +12,7 @@ class I18nMessage(BaseModel):
     - 采用f-string模板
     - 未匹配则默认用中文
     """
+
     zh_cn: str = Field(..., description="中文消息模板")
     en_us: str = Field(..., description="英文消息模板")
 
@@ -32,4 +34,5 @@ class ContextInfo(BaseModel):
     数据模型：上下文信息
     - 描述当前请求的上下文信息
     """
+
     language: str = Field(..., description="当前语言")
