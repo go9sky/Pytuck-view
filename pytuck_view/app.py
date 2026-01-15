@@ -12,7 +12,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .api.routes import router as api_router
+from .api import router as api_router
+from .base.middleware import language_context_middleware
 
 
 def create_app() -> FastAPI:
@@ -40,6 +41,9 @@ def create_app() -> FastAPI:
         templates = Jinja2Templates(directory=str(templates_path))
     else:
         templates = None
+
+    # 中间件：注入请求上下文（language）
+    app.middleware("http")(language_context_middleware)
 
     # 注册 API 路由
     app.include_router(api_router, prefix="/api")
