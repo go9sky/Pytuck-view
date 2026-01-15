@@ -7,15 +7,15 @@ API 路由模块
 """
 
 import asyncio
-from typing import Dict, List, Optional, Any
-from pathlib import Path
 import uuid
+from pathlib import Path
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, Request, UploadFile, File
+from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel
 
-from ..services.file_manager import file_manager, FileRecord
 from ..services.database import DatabaseService
+from ..services.file_manager import file_manager
 
 
 def _safe_filename(name: str) -> str:
@@ -26,21 +26,21 @@ def _safe_filename(name: str) -> str:
     return "".join(ch for ch in base if ch.isprintable()) or "upload.bin"
 
 
-
 # 创建路由器
 router = APIRouter()
 
 # 全局数据库服务实例字典（按 file_id 存储）
-db_services: Dict[str, DatabaseService] = {}
+db_services: dict[str, DatabaseService] = {}
 
 # 全局当前文件 ID（用于兼容性端点）
-current_file_id: Optional[str] = None
+current_file_id: str | None = None
 _current_file_lock = asyncio.Lock()
 
 
 # Pydantic 模型
 class OpenFileRequest(BaseModel):
     """打开文件请求模型"""
+
     path: str
 
 
@@ -63,57 +63,55 @@ def guess_type(s: str):
 
     # 尝试转换为布尔值
     lower = s.lower()
-    if lower in ('true', 'false'):
-        return lower == 'true'
+    if lower in ("true", "false"):
+        return lower == "true"
 
     return s
 
 
-def parse_filter_params(query_params: Dict[str, str]) -> List[Dict[str, Any]]:
+def parse_filter_params(query_params: dict[str, str]) -> list[dict[str, Any]]:
     """解析 filter_* 查询参数"""
     filters = []
-    supported_ops = {'eq', 'gt', 'gte', 'lt', 'lte', 'contains', 'in'}
+    supported_ops = {"eq", "gt", "gte", "lt", "lte", "contains", "in"}
 
     for k, v in query_params.items():
-        if not k.startswith('filter_'):
+        if not k.startswith("filter_"):
             continue
 
         # 解析参数名: filter_field 或 filter_field__op
-        _, rest = k.split('filter_', 1)
-        if '__' in rest:
-            field, op = rest.split('__', 1)
+        _, rest = k.split("filter_", 1)
+        if "__" in rest:
+            field, op = rest.split("__", 1)
         else:
-            field, op = rest, 'eq'
+            field, op = rest, "eq"
 
         # 验证操作符
         if op not in supported_ops:
-            op = 'eq'
+            op = "eq"
 
         # 解析值
         value = v
-        if op == 'in':
+        if op == "in":
             # 处理 in 操作符，按逗号分割
-            values = [guess_type(x.strip()) for x in v.split(',') if x.strip()]
+            values = [guess_type(x.strip()) for x in v.split(",") if x.strip()]
             value = values
         else:
             value = guess_type(v)
 
-        filters.append({
-            "field": field,
-            "op": op,
-            "value": value
-        })
+        filters.append({"field": field, "op": op, "value": value})
 
     return filters
 
 
 # 统一响应格式
-def success_response(data: Any = None, msg: str = "操作成功") -> Dict[str, Any]:
+def success_response(data: Any = None, msg: str = "操作成功") -> dict[str, Any]:
     """成功响应格式"""
     return {"code": 200, "msg": msg, "data": data}
 
 
-def error_response(code: int = 500, msg: str = "操作失败", data: Any = None) -> Dict[str, Any]:
+def error_response(
+    code: int = 500, msg: str = "操作失败", data: Any = None
+) -> dict[str, Any]:
     """错误响应格式"""
     return {"code": code, "msg": msg, "data": data}
 
@@ -126,14 +124,16 @@ async def get_recent_files():
         files_data = []
 
         for file_record in recent_files:
-            files_data.append({
-                "file_id": file_record.file_id,
-                "path": file_record.path,
-                "name": file_record.name,
-                "last_opened": file_record.last_opened,
-                "file_size": file_record.file_size,
-                "engine_name": file_record.engine_name,
-            })
+            files_data.append(
+                {
+                    "file_id": file_record.file_id,
+                    "path": file_record.path,
+                    "name": file_record.name,
+                    "last_opened": file_record.last_opened,
+                    "file_size": file_record.file_size,
+                    "engine_name": file_record.engine_name,
+                }
+            )
 
         return success_response(data={"files": files_data}, msg="获取最近文件列表成功")
 
@@ -142,7 +142,7 @@ async def get_recent_files():
 
 
 @router.get("/discover-files")
-async def discover_files(directory: Optional[str] = Query(None)):
+async def discover_files(directory: str | None = Query(None)):
     """发现指定目录中的 pytuck 文件"""
     try:
         discovered = file_manager.discover_files(directory)
@@ -165,7 +165,9 @@ async def upload_open(file: UploadFile = File(...)):
 
         suffix = Path(file.filename or "").suffix
         safe_name = _safe_filename(file.filename or "upload")
-        tmp_path = upload_dir / f"upload_{Path(safe_name).stem}_{uuid.uuid4().hex}{suffix}"
+        tmp_path = (
+            upload_dir / f"upload_{Path(safe_name).stem}_{uuid.uuid4().hex}{suffix}"
+        )
 
         with open(tmp_path, "wb") as f:
             while True:
@@ -196,9 +198,9 @@ async def upload_open(file: UploadFile = File(...)):
 
         try:
             tables = db_service.list_tables()
-            real_tables = [t for t in tables if not t.startswith(('⚠️', '💡', '📋'))]
+            real_tables = [t for t in tables if not t.startswith(("⚠️", "💡", "📋"))]
             tables_count = len(real_tables)
-        except:
+        except Exception:
             tables_count = 0
 
         data = {
@@ -241,9 +243,9 @@ async def open_file(request: OpenFileRequest):
         try:
             tables = db_service.list_tables()
             # 过滤掉占位符表名
-            real_tables = [t for t in tables if not t.startswith(('⚠️', '💡', '📋'))]
+            real_tables = [t for t in tables if not t.startswith(("⚠️", "💡", "📋"))]
             tables_count = len(real_tables)
-        except:
+        except Exception:
             tables_count = 0
 
         data = {
@@ -305,14 +307,16 @@ async def get_tables(file_id: str):
         tables = db_service.list_tables()
 
         # 检查是否有占位符表
-        placeholder_tables = [t for t in tables if t.startswith(('⚠️', '💡', '📋'))]
+        placeholder_tables = [t for t in tables if t.startswith(("⚠️", "💡", "📋"))]
         if placeholder_tables:
             return success_response(
                 data={"tables": tables, "has_placeholder": True},
-                msg="表列表获取成功，但部分功能需要 pytuck 库支持"
+                msg="表列表获取成功，但部分功能需要 pytuck 库支持",
             )
         else:
-            return success_response(data={"tables": tables, "has_placeholder": False}, msg="表列表获取成功")
+            return success_response(
+                data={"tables": tables, "has_placeholder": False}, msg="表列表获取成功"
+            )
 
     except Exception as e:
         return error_response(code=500, msg=f"获取表列表失败: {str(e)}")
@@ -334,15 +338,16 @@ async def get_table_schema(file_id: str, table_name: str):
         data = {
             "table_name": table_info.name,
             "row_count": table_info.row_count,
-            "columns": table_info.columns
+            "columns": table_info.columns,
         }
 
         # 检查是否有占位符列
-        placeholder_columns = [c for c in table_info.columns if c.get("name", "").startswith('⚠️')]
+        placeholder_columns = [
+            c for c in table_info.columns if c.get("name", "").startswith("⚠️")
+        ]
         if placeholder_columns:
             return success_response(
-                data=data,
-                msg="表结构获取成功，但列信息功能需要 pytuck 库完善"
+                data=data, msg="表结构获取成功，但列信息功能需要 pytuck 库完善"
             )
         else:
             return success_response(data=data, msg="表结构获取成功")
@@ -358,8 +363,8 @@ async def get_table_rows(
     request: Request,
     page: int = Query(1, ge=1, description="页码，从 1 开始"),
     limit: int = Query(50, ge=1, le=1000, description="每页行数，最大 1000"),
-    sort: Optional[str] = Query(None, description="排序字段"),
-    order: str = Query("asc", pattern="^(asc|desc)$", description="排序方向")
+    sort: str | None = Query(None, description="排序字段"),
+    order: str = Query("asc", pattern="^(asc|desc)$", description="排序方向"),
 ):
     """获取表数据（分页，支持过滤）"""
     if file_id not in db_services:
@@ -376,20 +381,20 @@ async def get_table_rows(
             limit=limit,
             sort_by=sort,
             order=order,
-            filters=filters
+            filters=filters,
         )
 
         # 检查是否是占位符数据
         is_placeholder = (
-            data.get("rows") and len(data["rows"]) > 0 and
-            isinstance(data["rows"][0], dict) and
-            data["rows"][0].get("is_placeholder", False)
+            data.get("rows")
+            and len(data["rows"]) > 0
+            and isinstance(data["rows"][0], dict)
+            and data["rows"][0].get("is_placeholder", False)
         )
 
         if is_placeholder:
             return success_response(
-                data=data,
-                msg="数据查询功能暂不可用，需要 pytuck 库支持"
+                data=data, msg="数据查询功能暂不可用，需要 pytuck 库支持"
             )
         else:
             msg = "表数据获取成功"
@@ -441,10 +446,7 @@ async def use_file(file_id: str):
         global current_file_id
         current_file_id = file_id
 
-    return success_response(
-        data={"file_id": file_id},
-        msg="设置当前数据库成功"
-    )
+    return success_response(data={"file_id": file_id}, msg="设置当前数据库成功")
 
 
 @router.get("/database-info/{file_id}")
@@ -473,12 +475,13 @@ async def get_status():
         "service": "pytuck-view",
         "version": "25.1.0",
         "open_databases": len(db_services),
-        "status": "running"
+        "status": "running",
     }
     return success_response(data=data, msg="服务状态正常")
 
 
 # ====================== 集成文档兼容性端点 ======================
+
 
 @router.post("/database/open")
 async def database_open(request: OpenFileRequest):
@@ -507,9 +510,9 @@ async def database_open(request: OpenFileRequest):
         # 获取表数量信息
         try:
             tables = db_service.list_tables()
-            real_tables = [t for t in tables if not t.startswith(('⚠️', '💡', '📋'))]
+            real_tables = [t for t in tables if not t.startswith(("⚠️", "💡", "📋"))]
             tables_count = len(real_tables)
-        except:
+        except Exception:
             tables_count = 0
 
         # 返回集成文档期望格式
@@ -520,7 +523,7 @@ async def database_open(request: OpenFileRequest):
             "tables_count": tables_count,
             "file_size": file_record.file_size,
             "engine_name": file_record.engine_name,
-            "status": "connected"
+            "status": "connected",
         }
 
     except HTTPException:
@@ -545,9 +548,18 @@ async def get_current_file_id() -> str:
         else:
             # 多个或无打开的数据库
             if len(db_services) == 0:
-                raise HTTPException(status_code=400, detail="没有打开的数据库文件，请先调用 /api/database/open")
+                raise HTTPException(
+                    status_code=400,
+                    detail="没有打开的数据库文件，请先调用 /api/database/open",
+                )
             else:
-                raise HTTPException(status_code=400, detail="存在多个打开数据库，请调用 /api/use-file/{file_id} 设置当前数据库")
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "存在多个打开数据库，请调用 /api/use-file/{file_id} "
+                        "设置当前数据库"
+                    ),
+                )
 
     if fid not in db_services:
         raise HTTPException(status_code=404, detail="当前数据库文件未找到")
@@ -564,13 +576,10 @@ async def get_tables_compat():
         tables = db_service.list_tables()
 
         # 过滤掉占位符表
-        real_tables = [t for t in tables if not t.startswith(('⚠️', '💡', '📋'))]
+        real_tables = [t for t in tables if not t.startswith(("⚠️", "💡", "📋"))]
 
         # 返回集成文档格式
-        return {
-            "tables": real_tables,
-            "total_count": len(real_tables)
-        }
+        return {"tables": real_tables, "total_count": len(real_tables)}
 
     except HTTPException:
         raise
@@ -595,7 +604,7 @@ async def get_table_schema_compat(table_name: str):
             "comment": "",  # pytuck 中暂无注释支持
             "primary_key": None,  # 可以从 columns 中推断
             "record_count": table_info.row_count,
-            "columns": table_info.columns
+            "columns": table_info.columns,
         }
 
     except HTTPException:
@@ -610,8 +619,8 @@ async def get_table_data_compat(
     request: Request,
     limit: int = Query(50, ge=1, le=1000, description="每页行数"),
     offset: int = Query(0, ge=0, description="偏移量"),
-    order_by: Optional[str] = Query(None, description="排序字段"),
-    order_desc: bool = Query(False, description="是否降序")
+    order_by: str | None = Query(None, description="排序字段"),
+    order_desc: bool = Query(False, description="是否降序"),
 ):
     """获取表数据（兼容性端点）"""
     try:
@@ -631,7 +640,7 @@ async def get_table_data_compat(
             limit=limit,
             sort_by=order_by,
             order=("desc" if order_desc else "asc"),
-            filters=filters
+            filters=filters,
         )
 
         # 获取表结构用于返回 schema
@@ -650,9 +659,9 @@ async def get_table_data_compat(
                 "total_records": data["total"],
                 "total_pages": total_pages,
                 "has_next": current_page < total_pages,
-                "has_prev": current_page > 1
+                "has_prev": current_page > 1,
             },
-            "schema": schema
+            "schema": schema,
         }
 
     except HTTPException:

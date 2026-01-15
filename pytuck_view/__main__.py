@@ -6,24 +6,23 @@ pytuck-view 应用入口点
 使用随机端口，确保零冲突
 """
 
-import os
-import sys
-import webbrowser
 import socket
-import time
+import sys
 import threading
+import time
+import webbrowser
 from contextlib import asynccontextmanager
 
 import uvicorn
 
-from pytuck_view.common.logger import init_logging, get_logger
-from pytuck_view.common.tiny_func import simplify_exception
+from pytuck_view.utils.logger import get_logger, init_logging
+from pytuck_view.utils.tiny_func import simplify_exception
 
 
 def find_free_port() -> int:
     """找到一个可用的端口"""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(('', 0))
+        s.bind(("", 0))
         s.listen(1)
         port = s.getsockname()[1]
     return port
@@ -31,6 +30,7 @@ def find_free_port() -> int:
 
 def open_browser(url: str, delay: float = 1.5):
     """延迟打开浏览器，确保服务器已启动"""
+
     def _open():
         time.sleep(delay)
         logger = get_logger(__name__)
@@ -63,7 +63,7 @@ def main():
         port = find_free_port()
         url = f"http://localhost:{port}"
 
-        logger.info("📊 pytuck-view v%s", __import__('pytuck_view').__version__)
+        logger.info("📊 pytuck-view v%s", __import__("pytuck_view").__version__)
         logger.info("🌐 服务器启动在: %s", url)
         logger.info("按 Ctrl+C 停止服务器")
 
