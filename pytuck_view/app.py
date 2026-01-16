@@ -2,15 +2,14 @@
 FastAPI 应用工厂
 
 创建和配置 FastAPI 应用实例
-挂载静态文件、模板和路由
+挂载静态文件和路由
 """
 
 from pathlib import Path
 
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
 from .api import router as api_router
 from .base.middleware import language_context_middleware
@@ -35,27 +34,22 @@ def create_app() -> FastAPI:
     if static_path.exists():
         app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
 
-    # 设置模板
-    templates_path = current_dir / "templates"
-    if templates_path.exists():
-        templates = Jinja2Templates(directory=str(templates_path))
-    else:
-        templates = None
-
     # 中间件：注入请求上下文（language）
     app.middleware("http")(language_context_middleware)
 
     # 注册 API 路由
     app.include_router(api_router, prefix="/api")
 
-    # 根路径路由 - 返回主页面
-    @app.get("/", response_class=HTMLResponse)
-    async def home(request: Request):
-        """返回主页面"""
-        if templates:
-            return templates.TemplateResponse("index.html", {"request": request})
+    # 根路径路由 - 返回静态主页面
+    static_index = current_dir / "static" / "index.html"
+
+    @app.get("/", response_class=FileResponse)
+    async def home():
+        """返回静态主页面"""
+        if static_index.exists():
+            return FileResponse(str(static_index))
         else:
-            # 如果模板不存在，返回简单的 HTML
+            # 如果静态文件不存在，返回简单的 HTML
             return HTMLResponse("""
             <!DOCTYPE html>
             <html>
@@ -64,8 +58,8 @@ def create_app() -> FastAPI:
                 <meta charset="utf-8">
             </head>
             <body>
-                <h1>pytuck-view 正在加载...</h1>
-                <p>模板文件尚未创建。</p>
+                <h1>pytuck-view</h1>
+                <p>index.html 未找到。</p>
             </body>
             </html>
             """)
