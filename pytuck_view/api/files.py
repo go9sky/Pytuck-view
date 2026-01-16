@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 from ..services.database import DatabaseService
 from ..services.file_manager import file_manager
-from .schemas import ApiResponse, Empty, fail, ok
+from ..base.schemas import ApiResponse, Empty, fail, ok
 
 router = APIRouter()
 

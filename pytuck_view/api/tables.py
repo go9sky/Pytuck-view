@@ -4,7 +4,7 @@ from typing import Any
 from fastapi import APIRouter, Query, Request
 
 from .files import db_services
-from .schemas import ApiResponse, PageData, fail, ok
+from ..base.schemas import ApiResponse, PageData, fail, ok
 
 router = APIRouter()
 
