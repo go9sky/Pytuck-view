@@ -8,7 +8,6 @@ dependencies = [
     "pydantic>=2.12.5",
     "pytuck[all]>=0.3.0",
     "uvicorn>=0.20.0",
-    "jinja2>=3.0.0",
 ]
 
 [dependency-groups]
