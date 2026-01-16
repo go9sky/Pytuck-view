@@ -52,8 +52,10 @@ class DatabaseService:
             if not path_obj.exists():
                 raise FileNotFoundError(f"数据库文件不存在: {file_path}")
 
-            # 根据文件扩展名确定引擎类型
-            is_valid, engine = is_valid_pytuck_database(file_path)
+            # 验证文件并识别引擎
+            is_valid, engine = is_valid_pytuck_database(path_obj)
+            if not is_valid:
+                raise ValueError(f"不是有效的 pytuck 数据库文件: {file_path}")
 
             # 创建 Storage 实例
             self.storage = Storage(
@@ -160,6 +162,10 @@ class DatabaseService:
                             ),
                             "nullable": bool(getattr(col_obj, "nullable", True)),
                             "primary_key": bool(getattr(col_obj, "primary_key", False)),
+                            "default_value": str(getattr(col_obj, "default", None)) if getattr(col_obj, "default", None) is not None else None,
+                            "comment": str(getattr(col_obj, "comment", "")) if getattr(col_obj, "comment", None) else None,
+                            "autoincrement": bool(getattr(col_obj, "autoincrement", False)),
+                            "unique": bool(getattr(col_obj, "unique", False)),
                         }
                         columns.append(col_info)
                 elif isinstance(table.columns, list):
@@ -171,6 +177,10 @@ class DatabaseService:
                                 "type": str(col_def.get("type", "unknown")),
                                 "nullable": bool(col_def.get("nullable", True)),
                                 "primary_key": bool(col_def.get("primary_key", False)),
+                                "default_value": str(col_def.get("default")) if col_def.get("default") is not None else None,
+                                "comment": str(col_def.get("comment", "")) if col_def.get("comment") else None,
+                                "autoincrement": bool(col_def.get("autoincrement", False)),
+                                "unique": bool(col_def.get("unique", False)),
                             }
                             columns.append(col_info)
 
