@@ -65,7 +65,12 @@ class FileManager:
         try:
             with open(self.config_file, encoding="utf-8") as f:
                 data = json.load(f)
-                return [FileRecord(**item) for item in data]
+                if isinstance(data, dict):
+                    # 新格式：包含 files 和 last_browse_directory
+                    files = data.get("files", [])
+                    return [FileRecord(**item) for item in files]
+                else:
+                    return []
         except Exception as e:
             logger = get_logger(__name__)
             logger.warning("无法加载最近文件列表: %s", simplify_exception(e))
@@ -77,8 +82,24 @@ class FileManager:
             return  # 内存模式，不保存
 
         try:
+            # 读取现有配置以保留 last_browse_directory
+            existing_last_dir = None
+            if self.config_file.exists():
+                try:
+                    with open(self.config_file, encoding="utf-8") as f:
+                        existing_data = json.load(f)
+                        if isinstance(existing_data, dict):
+                            existing_last_dir = existing_data.get("last_browse_directory")
+                except:
+                    pass
+
+            # 新格式：包含 files 和 last_browse_directory
+            data = {
+                "last_browse_directory": existing_last_dir,
+                "files": [asdict(record) for record in files]
+            }
+
             with open(self.config_file, "w", encoding="utf-8") as f:
-                data = [asdict(record) for record in files]
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception as e:
             logger = get_logger(__name__)
@@ -99,10 +120,10 @@ class FileManager:
         if not path_obj.exists():
             raise FileNotFoundError(f"文件不存在: {file_path}")
 
-        # 检查是否为支持的 pytuck 文件格式
+        # 验证文件并识别引擎
         is_valid, engine = is_valid_pytuck_database(path_obj)
         if not is_valid:
-            raise ValueError(f"该文件并非 Pytuck 数据库文件: {path_obj}")
+            raise ValueError(f"不是有效的 pytuck 数据库文件: {path_obj}")
 
         # 生成文件 ID 和记录
         file_id = str(uuid.uuid4())
@@ -175,6 +196,47 @@ class FileManager:
                     "无法删除临时文件 %s: %s", temp_path, simplify_exception(e)
                 )
 
+    def get_last_browse_directory(self) -> str | None:
+        """获取最后浏览的目录"""
+        if not self.config_file or not self.config_file.exists():
+            return None
+
+        try:
+            with open(self.config_file, encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data.get("last_browse_directory")
+        except Exception:
+            pass
+        return None
+
+    def update_last_browse_directory(self, directory: str):
+        """更新最后浏览的目录"""
+        if not self.config_file:
+            return
+
+        try:
+            # 读取现有数据
+            data = {"files": []}
+            if self.config_file.exists():
+                with open(self.config_file, encoding="utf-8") as f:
+                    existing_data = json.load(f)
+                    if isinstance(existing_data, dict):
+                        data = existing_data
+                    elif isinstance(existing_data, list):
+                        # 兼容旧格式
+                        data = {"files": existing_data}
+
+            # 更新 last_browse_directory
+            data["last_browse_directory"] = directory
+
+            # 保存
+            with open(self.config_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logger = get_logger(__name__)
+            logger.warning("更新最后浏览目录失败: %s", simplify_exception(e))
+
     def discover_files(self, directory: str | None = None) -> list[dict]:
         """在指定目录中发现 pytuck 文件"""
         target_dir = Path.cwd() / "databases" if directory is None else Path(directory)
@@ -188,6 +250,7 @@ class FileManager:
             for file_path in target_dir.iterdir():
                 if not file_path.is_file():
                     continue
+                # 验证文件
                 is_valid, engine = is_valid_pytuck_database(file_path)
                 if not is_valid:
                     continue
