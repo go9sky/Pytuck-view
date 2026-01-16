@@ -149,3 +149,107 @@ async def delete_recent_file(file_id: str) -> ApiResponse[Empty]:
         return ok(data=Empty(), msg="历史记录已删除")
     except Exception as e:
         return fail(msg=f"删除历史记录失败: {e}")
+
+
+@router.get(
+    "/user-home",
+    summary="获取用户主目录",
+    response_model=ApiResponse[dict],
+)
+async def get_user_home() -> ApiResponse[dict]:
+    """获取用户主目录路径"""
+    try:
+        home = str(Path.home())
+        return ok(data={"home": home}, msg="获取用户主目录成功")
+    except Exception as e:
+        return fail(msg=f"无法获取用户主目录: {e}")
+
+
+@router.get(
+    "/last-browse-directory",
+    summary="获取最后浏览的目录",
+    response_model=ApiResponse[dict],
+)
+async def get_last_browse_directory() -> ApiResponse[dict]:
+    """获取最后浏览的目录，为空则返回当前工作目录"""
+    try:
+        last_dir = file_manager.get_last_browse_directory()
+        if not last_dir or not Path(last_dir).exists():
+            # 使用当前工作目录作为默认
+            last_dir = str(Path.cwd())
+
+        return ok(data={"directory": last_dir}, msg="获取最后浏览目录成功")
+    except Exception as e:
+        return fail(msg=f"获取最后浏览目录失败: {e}")
+
+
+@router.get(
+    "/browse-directory",
+    summary="浏览目录内容",
+    response_model=ApiResponse[dict],
+)
+async def browse_directory(path: str | None = Query(None)) -> ApiResponse[dict]:
+    """浏览指定目录的文件和子目录
+
+    Args:
+        path: 目录路径，为空时使用用户主目录
+
+    Returns:
+        包含目录路径和条目列表的响应
+    """
+    try:
+        # 确定目标目录
+        if path:
+            target = Path(path).expanduser().resolve(strict=False)
+        else:
+            target = Path.home()
+
+        # 检查路径有效性
+        if not target.exists():
+            return fail(code=1, msg="路径不存在")
+        if not target.is_dir():
+            return fail(code=1, msg="不是目录")
+
+        # 不再筛选文件后缀，显示所有文件
+        entries = []
+
+        try:
+            # 遍历目录内容
+            for child in sorted(target.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower())):
+                try:
+                    if child.is_dir():
+                        # 添加子目录
+                        entries.append({
+                            "name": child.name,
+                            "path": str(child.resolve()),
+                            "type": "dir",
+                            "size": None,
+                            "mtime": child.stat().st_mtime,
+                        })
+                    elif child.is_file():
+                        # 添加所有文件（不做后缀筛选）
+                        entries.append({
+                            "name": child.name,
+                            "path": str(child.resolve()),
+                            "type": "file",
+                            "size": child.stat().st_size,
+                            "mtime": child.stat().st_mtime,
+                        })
+                except PermissionError:
+                    # 跳过无权限的条目
+                    continue
+        except PermissionError:
+            return fail(code=1, msg="无法访问该目录（权限不足）")
+
+        # 在成功返回前，记录这次浏览的目录
+        try:
+            file_manager.update_last_browse_directory(str(target))
+        except Exception:
+            pass  # 记录失败不影响响应
+
+        return ok(
+            data={"path": str(target), "entries": entries},
+            msg="浏览目录成功",
+        )
+    except Exception as e:
+        return fail(msg=f"浏览目录失败: {e}")
