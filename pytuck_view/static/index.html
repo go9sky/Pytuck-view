@@ -10,10 +10,194 @@
         #app {
             min-height: 100vh;
         }
+
+        /* 文件浏览器模态框样式 */
+        .file-browser-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .file-browser-modal {
+            background: white;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .file-browser-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .file-browser-header h2 {
+            margin: 0;
+            font-size: 18px;
+        }
+
+        .file-browser-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+        }
+
+        .file-browser-close:hover {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .file-browser-controls {
+            padding: 12px 20px;
+            border-bottom: 1px solid #e0e0e0;
+            background: #f9f9f9;
+        }
+
+        .file-browser-path-input {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .file-browser-path-input input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .file-browser-path-input button {
+            padding: 8px 16px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .file-browser-path-input button:hover {
+            background: #0056b3;
+        }
+
+        .file-browser-breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-wrap: wrap;
+            font-size: 14px;
+        }
+
+        .breadcrumb-item {
+            cursor: pointer;
+            color: #007bff;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .breadcrumb-item:hover {
+            background: #e7f3ff;
+        }
+
+        .breadcrumb-separator {
+            color: #999;
+        }
+
+        .file-browser-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 20px 20px;
+        }
+
+        .file-browser-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .file-browser-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .file-browser-item:hover {
+            background: #f5f5f5;
+            border-color: #007bff;
+        }
+
+        .file-browser-item-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex: 1;
+        }
+
+        .file-browser-item-icon {
+            font-size: 24px;
+        }
+
+        .file-browser-item-name {
+            font-weight: 500;
+        }
+
+        .file-browser-item-meta {
+            color: #666;
+            font-size: 13px;
+            margin-top: 4px;
+        }
+
+        .file-browser-item-action {
+            padding: 6px 12px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .file-browser-item-action:hover {
+            background: #218838;
+        }
+
+        .file-browser-empty {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
     </style>
 </head>
 <body>
-    {% raw %}
     <div id="app">
         <!-- 文件选择器页面 -->
         <div v-if="state.currentPage === 'file-selector'" class="file-selector">
@@ -34,26 +218,10 @@
                 <button @click="state.placeholderWarning = null">×</button>
             </div>
 
-            <!-- 添加文件（选择/拖拽） -->
-            <input
-                ref="fileInputRef"
-                type="file"
-                style="display:none"
-                @change="onFileSelected"
-            />
-
             <div class="quick-actions">
-                <button @click="triggerFileDialog" class="btn btn-primary" :disabled="state.loading">
-                    📁 选择文件
+                <button @click="openFileBrowser" class="btn btn-primary" :disabled="state.loading">
+                    📁 浏览目录
                 </button>
-            </div>
-
-            <div class="drop-zone"
-                 @dragenter.prevent
-                 @dragover.prevent
-                 @drop.prevent="onDrop">
-                <div class="drop-zone-title">把 pytuck 数据库文件拖到这里</div>
-                <div class="drop-zone-subtitle">或点击上方“选择文件”</div>
             </div>
 
             <!-- 历史文件（卡片） -->
@@ -61,10 +229,12 @@
                 <h2>📋 历史文件</h2>
                 <div class="file-cards">
                     <div v-for="file in state.recentFiles" :key="file.file_id" class="file-card" @click="openFile(file.path)">
-                        <button class="file-card-remove" title="移除" @click.stop="removeHistory(file.file_id)">×</button>
-                        <div class="file-card-title">
-                            <span class="file-card-name">{{ file.name }}</span>
-                            <span v-if="file.engine_name" class="engine-tag">{{ file.engine_name }}</span>
+                        <div class="file-card-header">
+                            <div class="file-card-title">
+                                <span class="file-card-name">{{ file.name }}</span>
+                                <span v-if="file.engine_name" class="engine-tag">{{ file.engine_name }}</span>
+                            </div>
+                            <button class="file-card-remove" title="移除" @click.stop="removeHistory(file.file_id)">×</button>
                         </div>
                         <div class="file-card-path">{{ file.path }}</div>
                         <div class="file-card-meta">
@@ -77,7 +247,7 @@
             <!-- 空状态 -->
             <div v-if="!state.loading && state.recentFiles.length === 0" class="empty-state">
                 <p>📁 还没有添加过文件</p>
-                <p>支持拖拽或选择一个 pytuck 数据库文件开始</p>
+                <p>点击"浏览目录"选择一个 pytuck 数据库文件开始</p>
             </div>
         </div>
 
@@ -136,17 +306,40 @@
                         <!-- 结构 Tab -->
                         <div v-if="state.activeTab === 'structure'" class="schema">
                             <h3>🔧 表结构</h3>
-                            <div v-if="state.tableSchema && state.tableSchema.columns" class="columns-list">
-                                <div v-for="col in state.tableSchema.columns" :key="col.name" class="column-row">
-                                    <div class="column-row-main">
-                                        <span class="col-name">{{ col.name }}</span>
-                                        <span class="col-type">{{ col.type }}</span>
-                                        <span v-if="col.primary_key" class="col-pk">🔑</span>
-                                    </div>
-                                    <div class="column-row-meta">
-                                        <span v-if="col.nullable === false">NOT NULL</span>
-                                    </div>
-                                </div>
+                            <div v-if="state.tableSchema && state.tableSchema.columns" class="schema-table-wrapper">
+                                <table class="schema-table">
+                                    <thead>
+                                        <tr>
+                                            <th>列名</th>
+                                            <th>数据类型</th>
+                                            <th>允许空值</th>
+                                            <th>主键</th>
+                                            <th>默认值</th>
+                                            <th>备注</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="col in state.tableSchema.columns" :key="col.name">
+                                            <td class="col-name-cell">
+                                                {{ col.name }}
+                                            </td>
+                                            <td class="col-type-cell">{{ col.type }}</td>
+                                            <td class="col-nullable-cell">
+                                                {{ col.nullable !== false ? '是' : '否' }}
+                                            </td>
+                                            <td class="col-pk-cell">
+                                                <span v-if="col.primary_key" class="pk-badge">🔑</span>
+                                                <span v-else>-</span>
+                                            </td>
+                                            <td class="col-default-cell">
+                                                {{ col.default_value || '-' }}
+                                            </td>
+                                            <td class="col-comment-cell">
+                                                {{ col.comment || '-' }}
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
 
@@ -192,12 +385,94 @@
             </div>
         </div>
 
+        <!-- 文件浏览器模态框 -->
+        <div v-if="fileBrowser.visible" class="file-browser-overlay" @click.self="closeFileBrowser">
+            <div class="file-browser-modal">
+                <div class="file-browser-header">
+                    <h2>📁 选择数据库文件</h2>
+                    <button class="file-browser-close" @click="closeFileBrowser">×</button>
+                </div>
+
+                <div class="file-browser-controls">
+                    <div class="file-browser-path-input">
+                        <input
+                            v-model="fileBrowser.pathInput"
+                            @keyup.enter="goToPath"
+                            placeholder="输入路径直接跳转..."
+                        />
+                        <button @click="goToPath">前往</button>
+                    </div>
+
+                    <div class="file-browser-breadcrumb">
+                        <span
+                            v-for="(part, index) in breadcrumbs"
+                            :key="index"
+                        >
+                            <span class="breadcrumb-item" @click="goToBreadcrumb(index)">
+                                {{ part.name }}
+                            </span>
+                            <span v-if="index < breadcrumbs.length - 1" class="breadcrumb-separator">/</span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="file-browser-content">
+                    <div v-if="fileBrowser.loading" style="text-align: center; padding: 40px;">
+                        加载中...
+                    </div>
+
+                    <ul v-else-if="fileBrowser.entries.length > 0" class="file-browser-list">
+                        <!-- 上级目录 -->
+                        <li v-if="canGoUp" class="file-browser-item" @click="goUp">
+                            <div class="file-browser-item-info">
+                                <span class="file-browser-item-icon">📁</span>
+                                <div>
+                                    <div class="file-browser-item-name">..</div>
+                                    <div class="file-browser-item-meta">上级目录</div>
+                                </div>
+                            </div>
+                        </li>
+
+                        <!-- 目录和文件 -->
+                        <li
+                            v-for="entry in fileBrowser.entries"
+                            :key="entry.path"
+                            class="file-browser-item"
+                            @click="entry.type === 'dir' ? browseTo(entry.path) : null"
+                        >
+                            <div class="file-browser-item-info">
+                                <span class="file-browser-item-icon">
+                                    {{ entry.type === 'dir' ? '📁' : '📄' }}
+                                </span>
+                                <div>
+                                    <div class="file-browser-item-name">{{ entry.name }}</div>
+                                    <div class="file-browser-item-meta">
+                                        {{ entry.type === 'file' ? formatFileSize(entry.size) : '' }}
+                                    </div>
+                                </div>
+                            </div>
+                            <button
+                                v-if="entry.type === 'file'"
+                                class="file-browser-item-action"
+                                @click.stop="selectAndOpenFile(entry.path)"
+                            >
+                                打开
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div v-else class="file-browser-empty">
+                        <p>📂 该目录为空或没有数据库文件</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- 全局加载状态 -->
         <div v-if="state.loading" class="loading-overlay">
             <div class="loading">加载中...</div>
         </div>
     </div>
-    {% endraw %}
 
     <!-- Vue.js 3.x 本地文件 -->
     <script src="/static/vue.min.js"></script>
@@ -222,9 +497,18 @@
                     rowsPerPage: 50,
                     loading: false,
                     error: null,
-                    placeholderWarning: null,  // 新增：占位符功能警告
+                    placeholderWarning: null,
                     sortBy: null,
                     sortOrder: 'asc'
+                });
+
+                // 文件浏览器状态
+                const fileBrowser = reactive({
+                    visible: false,
+                    path: "",
+                    pathInput: "",
+                    entries: [],
+                    loading: false
                 });
 
                 // 计算属性
@@ -236,7 +520,42 @@
                     return state.tableData && state.tableData.length > 0;
                 });
 
-                // API 调用封装 - 处理新的 {code, msg, data} 格式
+                const breadcrumbs = computed(() => {
+                    if (!fileBrowser.path) return [];
+
+                    const parts = fileBrowser.path.split(/[/\\]/).filter(p => p);
+                    const crumbs = [];
+
+                    // Windows 驱动器处理
+                    if (fileBrowser.path.match(/^[A-Z]:/i)) {
+                        crumbs.push({ name: parts[0], path: parts[0] + '\\' });
+                        for (let i = 1; i < parts.length; i++) {
+                            crumbs.push({
+                                name: parts[i],
+                                path: parts.slice(0, i + 1).join('\\')
+                            });
+                        }
+                    } else {
+                        // Unix-like 路径
+                        crumbs.push({ name: '根目录', path: '/' });
+                        for (let i = 0; i < parts.length; i++) {
+                            crumbs.push({
+                                name: parts[i],
+                                path: '/' + parts.slice(0, i + 1).join('/')
+                            });
+                        }
+                    }
+
+                    return crumbs;
+                });
+
+                const canGoUp = computed(() => {
+                    if (!fileBrowser.path) return false;
+                    // Windows 根目录 (C:\) 或 Unix 根目录 (/) 无法再上级
+                    return !fileBrowser.path.match(/^[A-Z]:[\\\/]?$/i) && fileBrowser.path !== '/';
+                });
+
+                // API 调用封装
                 async function api(path, options = {}) {
                     try {
                         const response = await fetch(`/api${path}`, {
@@ -249,20 +568,17 @@
 
                         const result = await response.json();
 
-                        // 处理新的 {code, msg, data} 格式
                         if (result.code !== undefined) {
-                            if (result.code !== 200) {
+                            if (result.code !== 0) {
                                 throw new Error(result.msg || `错误代码: ${result.code}`);
                             }
 
-                            // 检查是否有占位符功能的警告
                             if (result.msg && (result.msg.includes('暂不可用') || result.msg.includes('需要') || result.msg.includes('占位符'))) {
                                 state.placeholderWarning = result.msg;
                             }
 
                             return result.data;
                         } else if (!response.ok) {
-                            // 兼容老格式
                             throw new Error(result.detail || `HTTP ${response.status}`);
                         }
 
@@ -289,60 +605,79 @@
                     }
                 }
 
-
-                const fileInputRef = ref(null);
-
-                async function uploadAndOpen(file) {
-                    if (!file) return;
-
+                // 文件浏览器相关函数
+                async function openFileBrowser() {
+                    fileBrowser.visible = true;
+                    fileBrowser.loading = true;
                     try {
-                        state.loading = true;
-                        state.error = null;
-                        state.placeholderWarning = null;
-
-                        const form = new FormData();
-                        form.append('file', file);
-
-                        const response = await fetch('/api/upload-open', {
-                            method: 'POST',
-                            body: form
-                        });
-
-                        const result = await response.json();
-                        if (result.code !== undefined) {
-                            if (result.code !== 200) throw new Error(result.msg || `错误代码: ${result.code}`);
-                            if (result.msg && (result.msg.includes('暂不可用') || result.msg.includes('需要') || result.msg.includes('占位符'))) {
-                                state.placeholderWarning = result.msg;
-                            }
-                        } else if (!response.ok) {
-                            throw new Error(result.detail || `HTTP ${response.status}`);
-                        }
-
-                        const data = result.data || result;
-                        state.currentDatabase = data;
-                        state.currentPage = 'database-view';
-                        await loadTables();
-                        await loadRecentFiles();
-
+                        // 获取最后浏览的目录
+                        const data = await api('/last-browse-directory');
+                        const directory = data.directory;
+                        await browseTo(directory);
                     } catch (error) {
-                        console.error('上传打开失败:', error);
-                        state.error = `打开文件失败: ${error.message}`;
+                        state.error = `无法打开文件浏览器: ${error.message}`;
                     } finally {
-                        state.loading = false;
-                        if (fileInputRef.value) fileInputRef.value.value = '';
+                        fileBrowser.loading = false;
                     }
                 }
 
-                function onDrop(e) {
-                    const files = e.dataTransfer && e.dataTransfer.files;
-                    if (!files || files.length === 0) return;
-                    uploadAndOpen(files[0]);
+                function closeFileBrowser() {
+                    fileBrowser.visible = false;
                 }
 
-                function onFileSelected(e) {
-                    const files = e.target && e.target.files;
-                    if (!files || files.length === 0) return;
-                    uploadAndOpen(files[0]);
+                async function browseTo(path) {
+                    fileBrowser.loading = true;
+                    try {
+                        const data = await api(`/browse-directory?path=${encodeURIComponent(path)}`);
+                        fileBrowser.path = data.path;
+                        fileBrowser.pathInput = data.path;
+                        fileBrowser.entries = data.entries || [];
+                    } catch (error) {
+                        state.error = error.message;
+                    } finally {
+                        fileBrowser.loading = false;
+                    }
+                }
+
+                async function goToPath() {
+                    if (!fileBrowser.pathInput.trim()) return;
+                    await browseTo(fileBrowser.pathInput.trim());
+                }
+
+                async function goUp() {
+                    if (!canGoUp.value) return;
+
+                    const currentPath = fileBrowser.path;
+                    let parentPath;
+
+                    if (currentPath.match(/^[A-Z]:[\\\/]/i)) {
+                        // Windows 路径
+                        const parts = currentPath.split(/[\\\/]/).filter(p => p);
+                        if (parts.length === 1) {
+                            parentPath = parts[0] + '\\';
+                        } else {
+                            parentPath = parts.slice(0, -1).join('\\');
+                        }
+                    } else {
+                        // Unix-like 路径
+                        const parts = currentPath.split('/').filter(p => p);
+                        parentPath = '/' + parts.slice(0, -1).join('/');
+                        if (!parentPath || parentPath === '/') parentPath = '/';
+                    }
+
+                    await browseTo(parentPath);
+                }
+
+                async function goToBreadcrumb(index) {
+                    const crumb = breadcrumbs.value[index];
+                    if (crumb) {
+                        await browseTo(crumb.path);
+                    }
+                }
+
+                async function selectAndOpenFile(filePath) {
+                    closeFileBrowser();
+                    await openFile(filePath);
                 }
 
                 async function removeHistory(fileId) {
@@ -377,7 +712,6 @@
                         state.currentDatabase = data;
                         state.currentPage = 'database-view';
 
-                        // 立即加载表列表
                         await loadTables();
 
                     } catch (error) {
@@ -395,7 +729,6 @@
                         const data = await api(`/tables/${state.currentDatabase.file_id}`);
                         state.tables = data.tables || [];
 
-                        // 检查是否有占位符表
                         if (data.has_placeholder) {
                             state.placeholderWarning = '部分功能需要 pytuck 库支持，表列表可能不完整';
                         }
@@ -412,10 +745,8 @@
                         state.currentPageNum = 1;
                         state.activeTab = 'structure';
 
-                        // 先加载结构
                         await loadTableSchema(tableName);
 
-                        // 数据 Tab 采用按需加载
                         state.tableData = [];
                         state.totalRows = 0;
 
@@ -433,7 +764,6 @@
                     const data = await api(`/schema/${state.currentDatabase.file_id}/${tableName}`);
                     state.tableSchema = data;
 
-                    // 检查是否有占位符列
                     if (data.columns && data.columns.some(col => col.name && col.name.startsWith('⚠️'))) {
                         state.placeholderWarning = '表结构功能需要 pytuck 库完善，列信息可能不准确';
                     }
@@ -461,7 +791,6 @@
                     state.totalRows = data.total || 0;
                     state.currentPageNum = data.page || 1;
 
-                    // 检查是否是占位符数据
                     if (data.rows && data.rows.length > 0 && data.rows[0].is_placeholder) {
                         state.placeholderWarning = '数据查询功能暂不可用，需要 pytuck 库支持';
                     }
@@ -497,13 +826,12 @@
                 async function goToPage(page) {
                     if (page < 1 || page > totalPages.value || !state.currentTable) return;
 
-                    // 切到数据 Tab 才加载数据
                     state.activeTab = 'data';
                     await loadTableData(state.currentTable, page);
                 }
 
                 // 返回文件选择页面
-                function backToFileSelector() {
+                async function backToFileSelector() {
                     state.currentPage = 'file-selector';
                     state.currentDatabase = null;
                     state.tables = [];
@@ -513,11 +841,14 @@
                     state.tableData = [];
                     state.totalRows = 0;
                     state.currentPageNum = 1;
+
+                    // 刷新历史文件列表
+                    await loadRecentFiles();
                 }
 
                 // 格式化文件大小
                 function formatFileSize(bytes) {
-                    if (bytes === 0) return '0 B';
+                    if (bytes === 0 || bytes === null) return '0 B';
                     const k = 1024;
                     const sizes = ['B', 'KB', 'MB', 'GB'];
                     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -530,14 +861,6 @@
                     return date.toLocaleString('zh-CN');
                 }
 
-                // 触发文件选择对话框
-                function triggerFileDialog() {
-                    if (state.loading) return;
-                    nextTick(() => {
-                        if (fileInputRef.value) fileInputRef.value.click();
-                    });
-                }
-
                 // 初始化
                 onMounted(async () => {
                     await loadRecentFiles();
@@ -545,23 +868,28 @@
 
                 return {
                     state,
-                    fileInputRef,
+                    fileBrowser,
                     totalPages,
                     hasData,
+                    breadcrumbs,
+                    canGoUp,
                     openFile,
-                    uploadAndOpen,
-                    onDrop,
-                    onFileSelected,
                     removeHistory,
                     switchToDataTab,
                     selectTable,
                     sortTable,
                     goToPage,
                     backToFileSelector,
-                    triggerFileDialog,
                     formatFileSize,
                     formatDate,
-                    loadRecentFiles
+                    loadRecentFiles,
+                    openFileBrowser,
+                    closeFileBrowser,
+                    browseTo,
+                    goToPath,
+                    goUp,
+                    goToBreadcrumb,
+                    selectAndOpenFile
                 };
             }
         }).mount('#app');
