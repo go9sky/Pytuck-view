@@ -7,8 +7,21 @@ dependencies = [
     "fastapi>=0.128.0",
     "pydantic>=2.12.5",
     "pytuck[all]>=0.3.0",
+    "ruff>=0.14.12",
+    "setuptools>=61.0",
     "uvicorn>=0.20.0",
 ]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["pytuck_view", "pytuck_view.api", "pytuck_view.base", "pytuck_view.services", "pytuck_view.utils", "pytuck_view.databases"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"*" = ["static/*", "static/**/*"]
 
 [dependency-groups]
 # uv dev 依赖组（PEP 735）：仅用于开发/CI，不进入运行时依赖链
@@ -16,6 +29,14 @@ dev = [
     "ruff>=0.9.0",
     "mypy>=1.13.0",
     "pytest>=8.3.0",
+    "invoke>=2.0.0",
+]
+
+# 打包依赖组：用于构建 wheel、zipapp、exe 等发布产物
+build = [
+    "build>=1.0.0",          # PEP 517 标准构建工具
+    "wheel>=0.42.0",         # wheel 格式支持
+    "nuitka>=2.0.0",         # 用于打包成独立可执行文件
 ]
 
 [tool.ruff]
