@@ -16,7 +16,7 @@
 | 服务器 | uvicorn | `>=0.20` | 同样纯 Python，Windows 无编译 |
 | 前端 | vue.min.js | 3.x 单文件落盘 | 体积小、响应式、与"view"谐音 |
 | UI 框架 | 无 | 原生 HTML + 少量 CSS | 避免打包体积爆炸 |
-| 代码风格 | ruff | formatter + linter（统一入口） | 提交前 `make fmt` |
+| 代码风格 | ruff | formatter + linter（统一入口） | 提交前 `invoke fmt` |
 | 类型检查 | mypy | strict（CI 门禁） | 关键边界类型覆盖，降低回归风险 |
 | 最低 Python | 3.12+ | 与 pyproject.toml 一致 | 使用 3.12 typing 改进 |
 
@@ -44,7 +44,7 @@ pytuck_view/
 
 ## 运行/调试
 
-**重要提示**：本项目使用虚拟环境管理依赖，确保使用虚拟环境中的工具运行。
+**重要提示**：本项目使用虚拟环境管理依赖，开发者使用 invoke 作为跨平台任务运行器。
 
 ### 环境准备
 ```bash
@@ -53,28 +53,31 @@ pytuck_view/
 .venv\Scripts\activate
 # macOS/Linux
 source .venv/bin/activate
+
+# 或使用 uv sync 同步依赖
+uv sync --group dev --group build
 ```
 
 ### 开发运行
 ```bash
-# 方式1：激活虚拟环境后直接运行
-uvicorn pytuck_view.app:create_app --factory --reload --port 8000
+# 方式1：使用 invoke（推荐）
+invoke run
 
-# 方式2：使用虚拟环境中的 uvicorn（无需激活）
-.venv/Scripts/uvicorn.exe pytuck_view.app:create_app --factory --reload --port 8000  # Windows
-.venv/bin/uvicorn pytuck_view.app:create_app --factory --reload --port 8000           # macOS/Linux
+# 方式2：直接使用 uvicorn
+uv run uvicorn pytuck_view.app:create_app --factory --reload --port 8000
 ```
 
 ### 本地质量门禁（建议提交前运行；CI 会强制）
 ```bash
-make fmt      # ruff format
-make check    # ruff check + mypy(strict) + pytest
+invoke fmt      # ruff format
+invoke check    # ruff check + mypy(strict) + pytest
 ```
 
 ### 一键打包
 ```bash
-make zipapp   # 生成 dist/pytuck-view.pyz
-make exe      # nuitka --onefile，生成 dist/pytuck-view.exe
+invoke wheel   # 生成 wheel 包到 dist/
+invoke zipapp  # 生成 dist/pytuck-view.pyz
+invoke exe     # nuitka --onefile，生成 dist/pytuck-view.exe
 ```
 
 ## API 设计原则
