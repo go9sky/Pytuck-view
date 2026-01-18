@@ -9,9 +9,24 @@
 - HTTP status 仍按语义返回（由路由决定）
 """
 
+from datetime import datetime
+import uuid
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+
+class FileRecord(BaseModel):
+    """文件记录数据类"""
+
+    file_id: str = Field(
+        default_factory=lambda: str(uuid.uuid4()), description="文件 ID"
+    )
+    path: str = Field(..., description="文件路径")
+    name: str = Field(..., description="文件名")
+    last_opened: str = Field(datetime.now().isoformat(), description="最后打开时间")
+    file_size: int = Field(0, description="文件大小")
+    engine_name: str = Field(..., description="引擎名称")
 
 
 class ApiResponse[T](BaseModel):

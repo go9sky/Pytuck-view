@@ -8,26 +8,14 @@
 import json
 import os
 import uuid
-from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 
 from pytuck.backends import is_valid_pytuck_database
 
+from pytuck_view.base.schemas import FileRecord
 from pytuck_view.utils.logger import logger
 from pytuck_view.utils.tiny_func import simplify_exception
-
-
-@dataclass
-class FileRecord:
-    """文件记录数据类"""
-
-    file_id: str
-    path: str
-    name: str
-    last_opened: str
-    file_size: int
-    engine_name: str
 
 
 class FileManager:
@@ -96,7 +84,7 @@ class FileManager:
             # 新格式：包含 files 和 last_browse_directory
             data = {
                 "last_browse_directory": existing_last_dir,
-                "files": [asdict(record) for record in files],
+                "files": [record.model_dump() for record in files],
             }
 
             with open(self.config_file, "w", encoding="utf-8") as f:
