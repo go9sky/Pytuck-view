@@ -12,31 +12,35 @@ class CommonI18n:
     SUCCESS = I18nMessage(zh_cn="操作成功", en_us="Operation successful")
 
     UNEXPECTED_ERROR = I18nMessage(
-        zh_cn="服务器内部错误: {error}", en_us="Internal server error: {error}"
+        zh_cn="[{summary}] 服务器内部错误: {error}",
+        en_us="[{summary}] Internal server error: {error}",
     )
+
+
+class ApiSummaryI18n:
+    """API 接口摘要国际化"""
+
+    GET_RECENT_FILES = I18nMessage(zh_cn="获取最近文件列表", en_us="Get recent files")
+
+    DISCOVER_FILES = I18nMessage(
+        zh_cn="发现数据库文件", en_us="Discover database files"
+    )
+
+    OPEN_FILE = I18nMessage(zh_cn="打开数据库文件", en_us="Open database file")
+
+    CLOSE_FILE = I18nMessage(zh_cn="关闭数据库文件", en_us="Close database file")
 
 
 class FileI18n:
     """文件管理模块国际化"""
 
     # 成功消息
-    GET_RECENT_FILES_SUCCESS = I18nMessage(
-        zh_cn="获取最近文件列表成功", en_us="Recent files retrieved successfully"
-    )
-
-    DISCOVER_FILES_SUCCESS = I18nMessage(
-        zh_cn="发现 {count} 个数据库文件", en_us="Discovered {count} database file(s)"
-    )
 
     OPEN_FILE_SUCCESS = I18nMessage(
         zh_cn="文件打开成功", en_us="File opened successfully"
     )
 
     # 错误消息
-    GET_RECENT_FILES_FAILED = I18nMessage(
-        zh_cn="获取最近文件列表失败: {error}",
-        en_us="Failed to get recent files: {error}",
-    )
 
     FILE_NOT_FOUND = I18nMessage(
         zh_cn="文件不存在: {path}", en_us="File not found: {path}"
