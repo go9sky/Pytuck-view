@@ -13,7 +13,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from pytuck_view.utils.schemas import I18nMessage
 
@@ -45,7 +45,7 @@ class Empty(BaseModel):
     pass
 
 
-class SuccessResult[T]:
+class SuccessResult[T](BaseModel):
     """成功结果包装器
 
     用于在 ResponseUtil 装饰器中返回自定义的成功消息。
@@ -53,33 +53,18 @@ class SuccessResult[T]:
     示例::
 
         @ResponseUtil(i18n_summary=ApiSummaryI18n.GET_TABLES)
-        async def get_tables(file_id: str) -> dict:
+        async def get_tables(file_id: str) -> SuccessResult[dict]:
             tables = db_service.list_tables()
             if has_placeholder(tables):
                 return SuccessResult(
                     data={"tables": tables},
                     i18n_msg=DatabaseI18n.GET_TABLES_WITH_PLACEHOLDER
                 )
-            return SuccessResult(
-                data={"tables": tables}
-            )
+            return SuccessResult(data={"tables": tables})
     """
-
-    def __init__(
-        self,
-        data: T,
-        i18n_msg: I18nMessage | None = None,
-        **i18n_args: Any,
-    ):
-        """初始化成功结果
-
-        :param data: 返回数据
-        :param i18n_msg: 自定义成功消息(国际化对象),为 None 时使用默认成功消息
-        :param i18n_args: 消息格式化参数
-        """
-        self.data = data
-        self.i18n_msg = i18n_msg
-        self.i18n_args = i18n_args
+    data: T = Field(..., description="响应数据")
+    i18n_msg: I18nMessage | None = None
+    i18n_args: dict[str, Any] = Field(default_factory=dict)
 
 
 class PageInfo(BaseModel):

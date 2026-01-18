@@ -125,12 +125,13 @@ async def get_table_rows(
         return SuccessResult(
             data=payload,
             i18n_msg=DatabaseI18n.GET_ROWS_WITH_FILTER,
-            pagination=pagination,
-            filter_count=len(filters),
+            i18n_args={"pagination": pagination, "filter_count": len(filters)},
         )
 
     return SuccessResult(
-        data=payload, i18n_msg=DatabaseI18n.GET_ROWS_SUCCESS, pagination=pagination
+        data=payload,
+        i18n_msg=DatabaseI18n.GET_ROWS_SUCCESS,
+        i18n_args={"pagination": pagination},
     )
 
 
