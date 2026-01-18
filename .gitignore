@@ -19,3 +19,6 @@ databases/
 build/
 dist/
 *.egg-info/
+
+# 前端翻译文件(自动生成)
+pytuck_view/static/locales/
