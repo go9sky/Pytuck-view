@@ -1,10 +1,14 @@
 """表/数据相关 API 路由"""
 
 from typing import Any
+
 from fastapi import APIRouter, Query, Request
 
-from .files import db_services
-from ..base.schemas import ApiResponse, PageData, fail, ok
+from pytuck_view.api.files import db_services
+from pytuck_view.base.exceptions import ServiceException
+from pytuck_view.base.i18n import ApiSummaryI18n, DatabaseI18n
+from pytuck_view.base.response import ResponseUtil
+from pytuck_view.base.schemas import ApiResponse, PageData, SuccessResult
 
 router = APIRouter()
 
@@ -14,26 +18,23 @@ router = APIRouter()
     summary="获取指定数据库的表列表",
     response_model=ApiResponse[dict],
 )
-async def get_tables(file_id: str) -> ApiResponse[dict]:
+@ResponseUtil(i18n_summary=ApiSummaryI18n.GET_TABLES)
+async def get_tables(file_id: str) -> SuccessResult[dict]:
+    """获取指定数据库的表列表"""
     if file_id not in db_services:
-        return fail(code=1, msg="数据库文件未打开")
+        raise ServiceException(DatabaseI18n.DB_NOT_OPENED)
 
-    try:
-        db_service = db_services[file_id]
-        tables = db_service.list_tables()
+    db_service = db_services[file_id]
+    tables = db_service.list_tables()
 
-        placeholder_tables = [t for t in tables if t.startswith(("⚠️", "💡", "📋"))]
-        if placeholder_tables:
-            return ok(
-                data={"tables": tables, "has_placeholder": True},
-                msg="表列表获取成功，但部分功能需要 pytuck 库支持",
-            )
-
-        return ok(
-            data={"tables": tables, "has_placeholder": False}, msg="表列表获取成功"
+    placeholder_tables = [t for t in tables if t.startswith(("⚠️", "💡", "📋"))]
+    if placeholder_tables:
+        return SuccessResult(
+            data={"tables": tables, "has_placeholder": True},
+            i18n_msg=DatabaseI18n.GET_TABLES_WITH_PLACEHOLDER,
         )
-    except Exception as e:
-        return fail(msg=f"获取表列表失败: {e}")
+
+    return SuccessResult(data={"tables": tables, "has_placeholder": False})
 
 
 @router.get(
@@ -41,32 +42,33 @@ async def get_tables(file_id: str) -> ApiResponse[dict]:
     summary="获取表结构信息",
     response_model=ApiResponse[dict],
 )
-async def get_table_schema(file_id: str, table_name: str) -> ApiResponse[dict]:
+@ResponseUtil(i18n_summary=ApiSummaryI18n.GET_TABLE_SCHEMA)
+async def get_table_schema(file_id: str, table_name: str) -> SuccessResult[dict]:
+    """获取表结构信息"""
     if file_id not in db_services:
-        return fail(code=1, msg="数据库文件未打开")
+        raise ServiceException(DatabaseI18n.DB_NOT_OPENED)
 
-    try:
-        db_service = db_services[file_id]
-        table_info = db_service.get_table_info(table_name)
+    db_service = db_services[file_id]
+    table_info = db_service.get_table_info(table_name)
 
-        if not table_info:
-            return fail(code=1, msg=f"表 '{table_name}' 不存在")
+    if not table_info:
+        raise ServiceException(DatabaseI18n.TABLE_NOT_EXISTS, table_name=table_name)
 
-        data = {
-            "table_name": table_info.name,
-            "row_count": table_info.row_count,
-            "columns": table_info.columns,
-        }
+    data = {
+        "table_name": table_info.name,
+        "row_count": table_info.row_count,
+        "columns": table_info.columns,
+    }
 
-        placeholder_columns = [
-            c for c in table_info.columns if c.get("name", "").startswith("⚠️")
-        ]
-        if placeholder_columns:
-            return ok(data=data, msg="表结构获取成功，但列信息功能需要 pytuck 库完善")
+    placeholder_columns = [
+        c for c in table_info.columns if c.get("name", "").startswith("⚠️")
+    ]
+    if placeholder_columns:
+        return SuccessResult(
+            data=data, i18n_msg=DatabaseI18n.GET_SCHEMA_WITH_PLACEHOLDER
+        )
 
-        return ok(data=data, msg="表结构获取成功")
-    except Exception as e:
-        return fail(msg=f"获取表结构失败: {e}")
+    return SuccessResult(data=data)
 
 
 @router.get(
@@ -74,6 +76,7 @@ async def get_table_schema(file_id: str, table_name: str) -> ApiResponse[dict]:
     summary="获取表数据（分页，支持过滤）",
     response_model=ApiResponse[PageData],
 )
+@ResponseUtil(i18n_summary=ApiSummaryI18n.GET_TABLE_ROWS)
 async def get_table_rows(
     file_id: str,
     table_name: str,
@@ -82,48 +85,53 @@ async def get_table_rows(
     limit: int = Query(50, ge=1, le=1000, description="每页行数，最大 1000"),
     sort: str | None = Query(None, description="排序字段"),
     order: str = Query("asc", pattern="^(asc|desc)$", description="排序方向"),
-) -> ApiResponse[PageData]:
+) -> SuccessResult[PageData]:
+    """获取表数据（分页，支持过滤）"""
     if file_id not in db_services:
-        return fail(code=1, msg="数据库文件未打开")
+        raise ServiceException(DatabaseI18n.DB_NOT_OPENED)
 
-    try:
-        filters = _parse_filter_params(dict(request.query_params))
-        db_service = db_services[file_id]
-        raw = db_service.get_table_data(
-            table_name=table_name,
-            page=page,
-            limit=limit,
-            sort_by=sort,
-            order=order,
-            filters=filters,
+    filters = _parse_filter_params(dict(request.query_params))
+    db_service = db_services[file_id]
+    raw = db_service.get_table_data(
+        table_name=table_name,
+        page=page,
+        limit=limit,
+        sort_by=sort,
+        order=order,
+        filters=filters,
+    )
+
+    payload = PageData(
+        page=int(raw.get("page", page)),
+        limit=int(raw.get("limit", limit)),
+        total=int(raw.get("total", 0)),
+        rows=list(raw.get("rows", [])),
+    )
+
+    # 检查是否为 placeholder 数据
+    is_placeholder = (
+        payload.rows
+        and isinstance(payload.rows[0], dict)
+        and payload.rows[0].get("is_placeholder", False)
+    )
+    if is_placeholder:
+        return SuccessResult(data=payload, i18n_msg=DatabaseI18n.GET_ROWS_PLACEHOLDER)
+
+    # 构造分页类型文本
+    pagination = "使用服务端分页" if raw.get("server_side") else "使用内存分页"
+
+    # 根据过滤条件返回不同消息
+    if filters:
+        return SuccessResult(
+            data=payload,
+            i18n_msg=DatabaseI18n.GET_ROWS_WITH_FILTER,
+            pagination=pagination,
+            filter_count=len(filters),
         )
 
-        payload = PageData(
-            page=int(raw.get("page", page)),
-            limit=int(raw.get("limit", limit)),
-            total=int(raw.get("total", 0)),
-            rows=list(raw.get("rows", [])),
-        )
-
-        msg = "表数据获取成功"
-        if raw.get("server_side"):
-            msg += "（使用服务端分页）"
-        else:
-            msg += "（使用内存分页）"
-        if filters:
-            msg += f"，应用了 {len(filters)} 个过滤条件"
-
-        is_placeholder = (
-            payload.rows
-            and isinstance(payload.rows[0], dict)
-            and payload.rows[0].get("is_placeholder", False)
-        )
-        if is_placeholder:
-            return ok(data=payload, msg="数据查询功能暂不可用，需要 pytuck 库支持")
-
-        return ok(data=payload, msg=msg)
-    except Exception as e:
-        return fail(msg=f"获取表数据失败: {e}")
+    return SuccessResult(
+        data=payload, i18n_msg=DatabaseI18n.GET_ROWS_SUCCESS, pagination=pagination
+    )
 
 
 def _guess_type(s: str) -> Any:

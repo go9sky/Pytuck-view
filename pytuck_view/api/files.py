@@ -15,9 +15,12 @@ from pathlib import Path
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
-from ..services.database import DatabaseService
-from ..services.file_manager import file_manager
-from ..base.schemas import ApiResponse, Empty, fail, ok
+from pytuck_view.base.exceptions import ResultWarningException, ServiceException
+from pytuck_view.base.i18n import ApiSummaryI18n, FileI18n
+from pytuck_view.base.response import ResponseUtil
+from pytuck_view.base.schemas import ApiResponse, Empty, SuccessResult
+from pytuck_view.services.database import DatabaseService
+from pytuck_view.services.file_manager import file_manager
 
 router = APIRouter()
 
@@ -34,23 +37,12 @@ _current_file_lock = asyncio.Lock()
     summary="获取最近打开的文件列表",
     response_model=ApiResponse[dict],
 )
-async def get_recent_files() -> ApiResponse[dict]:
-    try:
-        recent_files = file_manager.get_recent_files(limit=10)
-        files_data = [
-            {
-                "file_id": f.file_id,
-                "path": f.path,
-                "name": f.name,
-                "last_opened": f.last_opened,
-                "file_size": f.file_size,
-                "engine_name": f.engine_name,
-            }
-            for f in recent_files
-        ]
-        return ok(data={"files": files_data}, msg="获取最近文件列表成功")
-    except Exception as e:
-        return fail(msg=f"获取最近文件列表失败: {e}")
+@ResponseUtil(i18n_summary=ApiSummaryI18n.GET_RECENT_FILES)
+async def get_recent_files() -> dict:
+    """获取最近打开的文件列表"""
+    recent_files = file_manager.get_recent_files(limit=10)
+    files_data = [f.model_dump() for f in recent_files]
+    return {"files": files_data}
 
 
 @router.get(
@@ -58,12 +50,11 @@ async def get_recent_files() -> ApiResponse[dict]:
     summary="发现指定目录中的 pytuck 文件",
     response_model=ApiResponse[dict],
 )
-async def discover_files(directory: str | None = Query(None)) -> ApiResponse[dict]:
-    try:
-        discovered = file_manager.discover_files(directory)
-        return ok(data={"files": discovered}, msg="文件扫描成功")
-    except Exception as e:
-        return fail(msg=f"文件扫描失败: {e}")
+@ResponseUtil(i18n_summary=ApiSummaryI18n.DISCOVER_FILES)
+async def discover_files(directory: str | None = Query(None)) -> SuccessResult[dict]:
+    """发现指定目录中的 pytuck 文件"""
+    discovered = file_manager.discover_files(directory)
+    return SuccessResult(data={"files": discovered})
 
 
 class OpenFileBody(BaseModel):
@@ -75,36 +66,33 @@ class OpenFileBody(BaseModel):
     summary="打开数据库文件",
     response_model=ApiResponse[dict],
 )
-async def open_file(request: OpenFileBody) -> ApiResponse[dict]:
-    try:
-        file_record = file_manager.open_file(request.path)
-        if not file_record:
-            return fail(code=1, msg="无法打开文件")
+@ResponseUtil(i18n_summary=ApiSummaryI18n.OPEN_FILE)
+async def open_file(request: OpenFileBody) -> SuccessResult[dict]:
+    """打开数据库文件"""
+    file_record = file_manager.open_file(request.path)
+    if not file_record:
+        raise ServiceException(FileI18n.CANNOT_OPEN_FILE)
 
-        db_service = DatabaseService()
-        success = db_service.open_database(request.path)
-        if not success:
-            return fail(code=1, msg="数据库打开失败")
+    db_service = DatabaseService()
+    success = db_service.open_database(request.path)
+    if not success:
+        raise ServiceException(FileI18n.DATABASE_OPEN_FAILED)
 
-        db_services[file_record.file_id] = db_service
+    db_services[file_record.file_id] = db_service
 
-        # 获取表数量
-        tables = db_service.list_tables()
-        tables_count = len(tables)
+    # 获取表数量
+    tables = db_service.list_tables()
+    tables_count = len(tables)
 
-        data = {
-            "file_id": file_record.file_id,
-            "name": file_record.name,
-            "path": file_record.path,
-            "file_size": file_record.file_size,
-            "engine_name": file_record.engine_name,
-            "tables_count": tables_count,
-        }
-        return ok(data=data, msg="数据库打开成功")
-    except ValueError as e:
-        return fail(code=1, msg=str(e))
-    except Exception as e:
-        return fail(msg=f"打开文件失败: {e}")
+    data = {
+        "file_id": file_record.file_id,
+        "name": file_record.name,
+        "path": file_record.path,
+        "file_size": file_record.file_size,
+        "engine_name": file_record.engine_name,
+        "tables_count": tables_count,
+    }
+    return SuccessResult(data=data, i18n_msg=FileI18n.OPEN_FILE_SUCCESS)
 
 
 @router.delete(
@@ -112,21 +100,20 @@ async def open_file(request: OpenFileBody) -> ApiResponse[dict]:
     summary="关闭数据库文件",
     response_model=ApiResponse[Empty],
 )
-async def close_file(file_id: str) -> ApiResponse[Empty]:
-    try:
-        if file_id in db_services:
-            db_services[file_id].close()
-            del db_services[file_id]
+@ResponseUtil(i18n_summary=ApiSummaryI18n.CLOSE_FILE)
+async def close_file(file_id: str) -> SuccessResult[Empty]:
+    """关闭数据库文件"""
+    if file_id in db_services:
+        db_services[file_id].close()
+        del db_services[file_id]
 
-        async with _current_file_lock:
-            global current_file_id
-            if current_file_id == file_id:
-                current_file_id = None
+    async with _current_file_lock:
+        global current_file_id
+        if current_file_id == file_id:
+            current_file_id = None
 
-        file_manager.close_file(file_id)
-        return ok(data=Empty(), msg="文件已关闭")
-    except Exception as e:
-        return fail(msg=f"关闭文件失败: {e}")
+    file_manager.close_file(file_id)
+    return SuccessResult(data=Empty(), i18n_msg=FileI18n.CLOSE_FILE_SUCCESS)
 
 
 @router.delete(
@@ -134,26 +121,25 @@ async def close_file(file_id: str) -> ApiResponse[Empty]:
     summary="删除历史记录并关闭后台文件",
     response_model=ApiResponse[Empty],
 )
-async def delete_recent_file(file_id: str) -> ApiResponse[Empty]:
-    try:
-        if file_id in db_services:
-            db_services[file_id].close()
-            del db_services[file_id]
+@ResponseUtil(i18n_summary=ApiSummaryI18n.DELETE_RECENT_FILE)
+async def delete_recent_file(file_id: str) -> SuccessResult[Empty]:
+    """删除历史记录并关闭后台文件"""
+    if file_id in db_services:
+        db_services[file_id].close()
+        del db_services[file_id]
 
-        async with _current_file_lock:
-            global current_file_id
-            if current_file_id == file_id:
-                current_file_id = None
+    async with _current_file_lock:
+        global current_file_id
+        if current_file_id == file_id:
+            current_file_id = None
 
-        file_manager.close_file(file_id)
+    file_manager.close_file(file_id)
 
-        removed = file_manager.remove_from_history(file_id)
-        if not removed:
-            return fail(code=1, msg="历史记录不存在")
+    removed = file_manager.remove_from_history(file_id)
+    if not removed:
+        raise ResultWarningException(FileI18n.HISTORY_NOT_EXISTS)
 
-        return ok(data=Empty(), msg="历史记录已删除")
-    except Exception as e:
-        return fail(msg=f"删除历史记录失败: {e}")
+    return SuccessResult(data=Empty(), i18n_msg=FileI18n.DELETE_RECENT_FILE_SUCCESS)
 
 
 @router.get(
@@ -161,13 +147,11 @@ async def delete_recent_file(file_id: str) -> ApiResponse[Empty]:
     summary="获取用户主目录",
     response_model=ApiResponse[dict],
 )
-async def get_user_home() -> ApiResponse[dict]:
+@ResponseUtil(i18n_summary=ApiSummaryI18n.GET_USER_HOME)
+async def get_user_home() -> SuccessResult[dict]:
     """获取用户主目录路径"""
-    try:
-        home = str(Path.home())
-        return ok(data={"home": home}, msg="获取用户主目录成功")
-    except Exception as e:
-        return fail(msg=f"无法获取用户主目录: {e}")
+    home = str(Path.home())
+    return SuccessResult(data={"home": home})
 
 
 @router.get(
@@ -175,17 +159,15 @@ async def get_user_home() -> ApiResponse[dict]:
     summary="获取最后浏览的目录",
     response_model=ApiResponse[dict],
 )
-async def get_last_browse_directory() -> ApiResponse[dict]:
+@ResponseUtil(i18n_summary=ApiSummaryI18n.GET_LAST_BROWSE_DIRECTORY)
+async def get_last_browse_directory() -> SuccessResult[dict]:
     """获取最后浏览的目录，为空则返回当前工作目录"""
-    try:
-        last_dir = file_manager.get_last_browse_directory()
-        if not last_dir or not Path(last_dir).exists():
-            # 使用当前工作目录作为默认
-            last_dir = str(Path.cwd())
+    last_dir = file_manager.get_last_browse_directory()
+    if not last_dir or not Path(last_dir).exists():
+        # 使用当前工作目录作为默认
+        last_dir = str(Path.cwd())
 
-        return ok(data={"directory": last_dir}, msg="获取最后浏览目录成功")
-    except Exception as e:
-        return fail(msg=f"获取最后浏览目录失败: {e}")
+    return SuccessResult(data={"directory": last_dir})
 
 
 @router.get(
@@ -193,7 +175,8 @@ async def get_last_browse_directory() -> ApiResponse[dict]:
     summary="浏览目录内容",
     response_model=ApiResponse[dict],
 )
-async def browse_directory(path: str | None = Query(None)) -> ApiResponse[dict]:
+@ResponseUtil(i18n_summary=ApiSummaryI18n.BROWSE_DIRECTORY)
+async def browse_directory(path: str | None = Query(None)) -> SuccessResult[dict]:
     """浏览指定目录的文件和子目录
 
     Args:
@@ -202,65 +185,59 @@ async def browse_directory(path: str | None = Query(None)) -> ApiResponse[dict]:
     Returns:
         包含目录路径和条目列表的响应
     """
+    # 确定目标目录
+    if path:
+        target = Path(path).expanduser().resolve(strict=False)
+    else:
+        target = Path.home()
+
+    # 检查路径有效性
+    if not target.exists():
+        raise ServiceException(FileI18n.PATH_NOT_EXISTS)
+    if not target.is_dir():
+        raise ServiceException(FileI18n.NOT_A_DIRECTORY)
+
+    # 不再筛选文件后缀，显示所有文件
+    entries = []
+
     try:
-        # 确定目标目录
-        if path:
-            target = Path(path).expanduser().resolve(strict=False)
-        else:
-            target = Path.home()
+        # 遍历目录内容
+        for child in sorted(
+            target.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower())
+        ):
+            try:
+                if child.is_dir():
+                    # 添加子目录
+                    entries.append(
+                        {
+                            "name": child.name,
+                            "path": str(child.resolve()),
+                            "type": "dir",
+                            "size": None,
+                            "mtime": child.stat().st_mtime,
+                        }
+                    )
+                elif child.is_file():
+                    # 添加所有文件（不做后缀筛选）
+                    entries.append(
+                        {
+                            "name": child.name,
+                            "path": str(child.resolve()),
+                            "type": "file",
+                            "size": child.stat().st_size,
+                            "mtime": child.stat().st_mtime,
+                        }
+                    )
+            except PermissionError:
+                # 跳过无权限的条目
+                continue
+    except PermissionError:
+        raise ServiceException(FileI18n.ACCESS_DENIED)
 
-        # 检查路径有效性
-        if not target.exists():
-            return fail(code=1, msg="路径不存在")
-        if not target.is_dir():
-            return fail(code=1, msg="不是目录")
+    # 在成功返回前，记录这次浏览的目录
+    try:
+        file_manager.update_last_browse_directory(str(target))
+    except Exception:
+        pass  # 记录失败不影响响应
 
-        # 不再筛选文件后缀，显示所有文件
-        entries = []
-
-        try:
-            # 遍历目录内容
-            for child in sorted(
-                target.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower())
-            ):
-                try:
-                    if child.is_dir():
-                        # 添加子目录
-                        entries.append(
-                            {
-                                "name": child.name,
-                                "path": str(child.resolve()),
-                                "type": "dir",
-                                "size": None,
-                                "mtime": child.stat().st_mtime,
-                            }
-                        )
-                    elif child.is_file():
-                        # 添加所有文件（不做后缀筛选）
-                        entries.append(
-                            {
-                                "name": child.name,
-                                "path": str(child.resolve()),
-                                "type": "file",
-                                "size": child.stat().st_size,
-                                "mtime": child.stat().st_mtime,
-                            }
-                        )
-                except PermissionError:
-                    # 跳过无权限的条目
-                    continue
-        except PermissionError:
-            return fail(code=1, msg="无法访问该目录（权限不足）")
-
-        # 在成功返回前，记录这次浏览的目录
-        try:
-            file_manager.update_last_browse_directory(str(target))
-        except Exception:
-            pass  # 记录失败不影响响应
-
-        return ok(
-            data={"path": str(target), "entries": entries},
-            msg="浏览目录成功",
-        )
-    except Exception as e:
-        return fail(msg=f"浏览目录失败: {e}")
+    return SuccessResult(data={"path": str(target), "entries": entries})

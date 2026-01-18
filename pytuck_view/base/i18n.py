@@ -30,6 +30,22 @@ class ApiSummaryI18n:
 
     CLOSE_FILE = I18nMessage(zh_cn="关闭数据库文件", en_us="Close database file")
 
+    DELETE_RECENT_FILE = I18nMessage(zh_cn="删除历史记录", en_us="Delete recent file")
+
+    GET_USER_HOME = I18nMessage(zh_cn="获取用户主目录", en_us="Get user home")
+
+    GET_LAST_BROWSE_DIRECTORY = I18nMessage(
+        zh_cn="获取最后浏览目录", en_us="Get last browse directory"
+    )
+
+    BROWSE_DIRECTORY = I18nMessage(zh_cn="浏览目录", en_us="Browse directory")
+
+    GET_TABLES = I18nMessage(zh_cn="获取表列表", en_us="Get tables")
+
+    GET_TABLE_SCHEMA = I18nMessage(zh_cn="获取表结构", en_us="Get table schema")
+
+    GET_TABLE_ROWS = I18nMessage(zh_cn="获取表数据", en_us="Get table rows")
+
 
 class FileI18n:
     """文件管理模块国际化"""
@@ -38,6 +54,14 @@ class FileI18n:
 
     OPEN_FILE_SUCCESS = I18nMessage(
         zh_cn="文件打开成功", en_us="File opened successfully"
+    )
+
+    CLOSE_FILE_SUCCESS = I18nMessage(
+        zh_cn="文件已关闭", en_us="File closed successfully"
+    )
+
+    DELETE_RECENT_FILE_SUCCESS = I18nMessage(
+        zh_cn="历史记录已删除", en_us="Recent file deleted successfully"
     )
 
     # 错误消息
@@ -50,6 +74,31 @@ class FileI18n:
 
     OPEN_FILE_FAILED = I18nMessage(
         zh_cn="打开文件失败: {error}", en_us="Failed to open file: {error}"
+    )
+
+    DATABASE_OPEN_FAILED = I18nMessage(
+        zh_cn="数据库打开失败", en_us="Failed to open database"
+    )
+
+    GET_RECENT_FILES_FAILED = I18nMessage(
+        zh_cn="获取最近文件失败: {error}", en_us="Failed to get recent files: {error}"
+    )
+
+    HISTORY_NOT_EXISTS = I18nMessage(
+        zh_cn="历史记录不存在", en_us="History record not exists"
+    )
+
+    GET_USER_HOME_FAILED = I18nMessage(
+        zh_cn="无法获取用户主目录: {error}", en_us="Failed to get user home: {error}"
+    )
+
+    GET_LAST_BROWSE_DIR_FAILED = I18nMessage(
+        zh_cn="获取最后浏览目录失败: {error}",
+        en_us="Failed to get last browse directory: {error}",
+    )
+
+    BROWSE_DIRECTORY_FAILED = I18nMessage(
+        zh_cn="浏览目录失败: {error}", en_us="Failed to browse directory: {error}"
     )
 
     PATH_NOT_EXISTS = I18nMessage(zh_cn="路径不存在", en_us="Path does not exist")
@@ -86,4 +135,32 @@ class DatabaseI18n:
 
     GET_ROWS_FAILED = I18nMessage(
         zh_cn="获取表数据失败: {error}", en_us="Failed to get rows: {error}"
+    )
+
+    # 自定义成功消息 (用于 SuccessResult)
+    GET_TABLES_WITH_PLACEHOLDER = I18nMessage(
+        zh_cn="表列表获取成功,但部分功能需要 pytuck 库支持",
+        en_us="Tables retrieved successfully, but some features require pytuck library",
+    )
+
+    GET_SCHEMA_WITH_PLACEHOLDER = I18nMessage(
+        zh_cn="表结构获取成功,但列信息功能需要 pytuck 库完善",
+        en_us="Schema retrieved successfully, but column info requires pytuck library",
+    )
+
+    GET_ROWS_PLACEHOLDER = I18nMessage(
+        zh_cn="数据查询功能暂不可用,需要 pytuck 库支持",
+        en_us="Data query not available, requires pytuck library",
+    )
+
+    GET_ROWS_WITH_FILTER = I18nMessage(
+        zh_cn="表数据获取成功({pagination}),应用了 {filter_count} 个过滤条件",
+        en_us=(
+            "Rows retrieved successfully ({pagination}), applied {filter_count} filters"
+        ),
+    )
+
+    GET_ROWS_SUCCESS = I18nMessage(
+        zh_cn="表数据获取成功({pagination})",
+        en_us="Rows retrieved successfully ({pagination})",
     )
