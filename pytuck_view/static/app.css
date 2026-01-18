@@ -748,54 +748,60 @@ body {
     position: fixed;
     top: 20px;
     right: 20px;
-    display: flex;
-    gap: 8px;
     z-index: 1000;
 }
 
-.language-switcher button {
-    background: var(--bg-secondary, #f5f5f5);
+.language-toggle {
+    background: #f5f5f5;
     border: 2px solid transparent;
     border-radius: 6px;
-    padding: 6px 12px;
-    font-size: 18px;
+    padding: 8px 14px;
+    font-size: 20px;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
     transition: all 0.2s ease;
 }
 
-.language-switcher button:hover:not(:disabled) {
-    background: var(--bg-hover, #e0e0e0);
-    transform: scale(1.05);
+.language-toggle:hover:not(:disabled) {
+    background: #e0e0e0;
 }
 
-.language-switcher button.active {
-    border-color: var(--primary-color, #007bff);
-    background: var(--bg-active, #e7f3ff);
-}
-
-.language-switcher button:disabled {
-    opacity: 0.5;
+.language-toggle:disabled {
+    opacity: 0.7;
     cursor: not-allowed;
 }
 
-/* 加载覆盖层 */
-.loading-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
+.language-menu {
+    position: absolute;
+    top: 45px;
     right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.3);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    min-width: 150px;
+    overflow: hidden;
 }
 
-.loading-spinner {
-    background: white;
-    padding: 20px 40px;
-    border-radius: 8px;
-    font-size: 16px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+.language-menu-item {
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.language-menu-item:hover {
+    background: #f5f5f5;
+}
+
+.language-menu-item.active {
+    background: #e7f3ff;
+    color: #007bff;
+    font-weight: 500;
+}
+
+.loading-indicator {
+    font-size: 14px;
+    animation: spin 1s linear infinite;
 }

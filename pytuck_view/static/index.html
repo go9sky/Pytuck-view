@@ -198,37 +198,36 @@
     </style>
 </head>
 <body>
-    <div id="app">
+    <div id="app" @click="handleGlobalClick">
         <!-- 语言切换器(右上角) -->
         <div class="language-switcher">
-            <button
-                @click="switchLocale('zh_cn')"
-                :class="{ active: locale === 'zh_cn' }"
-                :disabled="isLoadingLocale"
-                :title="t('language.chinese')"
-            >
-                🇨🇳
+            <button class="language-toggle" @click="toggleLanguageMenu" :disabled="isLoadingLocale">
+                🌐
+                <span class="loading-indicator" v-if="isLoadingLocale">⏳</span>
             </button>
-            <button
-                @click="switchLocale('en_us')"
-                :class="{ active: locale === 'en_us' }"
-                :disabled="isLoadingLocale"
-                :title="t('language.english')"
-            >
-                🇺🇸
-            </button>
-        </div>
-
-        <!-- 加载指示器 -->
-        <div v-if="isLoadingLocale" class="loading-overlay">
-            <div class="loading-spinner">{{ t('common.loading') }}</div>
+            <div v-if="showLanguageMenu" class="language-menu">
+                <div
+                    class="language-menu-item"
+                    :class="{ active: locale === 'zh_cn' }"
+                    @click="switchLocale('zh_cn')"
+                >
+                    简体中文
+                </div>
+                <div
+                    class="language-menu-item"
+                    :class="{ active: locale === 'en_us' }"
+                    @click="switchLocale('en_us')"
+                >
+                    English
+                </div>
+            </div>
         </div>
 
         <!-- 文件选择器页面 -->
         <div v-if="state.currentPage === 'file-selector'" class="file-selector">
             <header class="header">
                 <h1>📊 pytuck-view</h1>
-                <p>选择一个 pytuck 数据库文件开始浏览</p>
+                <p>{{ t('common.selectDatabaseHint') }}</p>
             </header>
 
             <!-- 错误提示 -->
@@ -279,10 +278,10 @@
         <!-- 数据库查看页面 -->
         <div v-else-if="state.currentPage === 'database-view'" class="database-view">
             <header class="header">
-                <button @click="backToFileSelector" class="btn btn-back">← 返回</button>
+                <button @click="backToFileSelector" class="btn btn-back">← {{ t('common.back') }}</button>
                 <div class="db-info">
                     <h1>📊 {{ state.currentDatabase.name }}</h1>
-                    <p>{{ state.currentDatabase.tables_count }} 张表 • {{ formatFileSize(state.currentDatabase.file_size) }}</p>
+                    <p>{{ state.currentDatabase.tables_count }} {{ t('common.tablesCount') }} • {{ formatFileSize(state.currentDatabase.file_size) }}</p>
                 </div>
             </header>
 
@@ -295,7 +294,7 @@
             <div class="main-content">
                 <!-- 侧边栏 - 表列表 -->
                 <aside class="sidebar">
-                    <h3>📋 数据表</h3>
+                    <h3>📋 {{ t('table.dataTables') }}</h3>
                     <div class="table-list">
                         <div v-for="table in state.tables" :key="table"
                              class="table-item"
@@ -312,35 +311,34 @@
                 <!-- 主内容区 -->
                 <main class="content">
                     <div v-if="!state.currentTable" class="welcome">
-                        <h2>👈 选择一个表开始浏览</h2>
+                        <h2>👈 {{ t('table.selectTableHint') }}</h2>
                     </div>
 
                     <div v-else>
                         <!-- 表信息 -->
                         <div v-if="state.tableSchema" class="table-info">
                             <h2>📊 {{ state.tableSchema.table_name }}</h2>
-                            <p>{{ state.tableSchema.row_count }} 行数据</p>
+                            <p>{{ state.tableSchema.row_count }} {{ t('table.rowsCount') }}</p>
                         </div>
 
                         <!-- Tab -->
                         <div class="tab-bar">
-                            <button class="tab" :class="{active: state.activeTab === 'structure'}" @click="state.activeTab = 'structure'">结构</button>
-                            <button class="tab" :class="{active: state.activeTab === 'data'}" @click="switchToDataTab">数据</button>
+                            <button class="tab" :class="{active: state.activeTab === 'structure'}" @click="state.activeTab = 'structure'">{{ t('table.tabStructure') }}</button>
+                            <button class="tab" :class="{active: state.activeTab === 'data'}" @click="switchToDataTab">{{ t('table.tabData') }}</button>
                         </div>
 
                         <!-- 结构 Tab -->
                         <div v-if="state.activeTab === 'structure'" class="schema">
-                            <h3>🔧 表结构</h3>
                             <div v-if="state.tableSchema && state.tableSchema.columns" class="schema-table-wrapper">
                                 <table class="schema-table">
                                     <thead>
                                         <tr>
-                                            <th>列名</th>
-                                            <th>数据类型</th>
-                                            <th>允许空值</th>
-                                            <th>主键</th>
-                                            <th>默认值</th>
-                                            <th>备注</th>
+                                            <th>{{ t('table.colName') }}</th>
+                                            <th>{{ t('table.colType') }}</th>
+                                            <th>{{ t('table.colNullable') }}</th>
+                                            <th>{{ t('table.colPrimaryKey') }}</th>
+                                            <th>{{ t('table.colDefault') }}</th>
+                                            <th>{{ t('table.colComment') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -507,6 +505,7 @@
         const i18n = {
             locale: 'zh_cn',
             messages: {},  // 翻译字典(从 JSON 加载)
+            messageCache: {},  // 缓存已加载的翻译
             loading: false,
             loaded: new Set(),  // 已加载的语言
 
@@ -517,18 +516,24 @@
 
             // 加载指定语言的翻译
             async loadLocale(locale) {
-                if (this.loaded.has(locale)) {
-                    return;  // 已加载,跳过
-                }
-
                 this.loading = true;
                 try {
+                    // 如果已加载,从缓存中恢复
+                    if (this.loaded.has(locale) && this.messageCache[locale]) {
+                        this.messages = this.messageCache[locale];
+                        console.log(`✓ 切换到已加载语言: ${locale}`);
+                        this.loading = false;
+                        return;
+                    }
+
+                    // 首次加载
                     const response = await fetch(`/static/locales/${locale}.json`);
                     if (!response.ok) {
                         throw new Error(`HTTP ${response.status}`);
                     }
                     const translations = await response.json();
                     this.messages = translations;
+                    this.messageCache[locale] = translations;  // 缓存
                     this.loaded.add(locale);
                     console.log(`✓ 已加载语言: ${locale} (${Object.keys(translations).length} 个翻译)`);
                 } catch (error) {
@@ -574,33 +579,51 @@
             }
         };
 
-        // 在页面加载时初始化
-        i18n.init();
+        // 在页面加载时初始化,等待完成后再挂载 Vue 应用
+        (async () => {
+            await i18n.init();
 
-        // ========== Vue 应用 ==========
-        const { createApp, ref, reactive, computed, onMounted, nextTick, watch } = Vue;
+            // ========== Vue 应用 ==========
+            const { createApp, ref, reactive, computed, onMounted, nextTick, watch } = Vue;
 
-        createApp({
+            createApp({
             setup() {
                 // i18n 响应式状态
                 const locale = ref(i18n.locale);
                 const isLoadingLocale = ref(i18n.loading);
+                const showLanguageMenu = ref(false);  // 新增: 控制菜单显示
 
                 // 翻译函数
                 const t = (key) => i18n.t(key);
 
                 // 切换语言
                 const switchLocale = async (newLocale) => {
-                    if (newLocale === locale.value) return;
+                    showLanguageMenu.value = false;  // 关闭菜单
+
+                    if (newLocale === locale.value && i18n.loaded.has(newLocale)) {
+                        return;  // 已是当前语言且已加载,不重复操作
+                    }
 
                     isLoadingLocale.value = true;
                     await i18n.setLocale(newLocale);
                     locale.value = newLocale;
                     isLoadingLocale.value = false;
 
-                    // 切换后重新加载数据(如果有打开的文件)
+                    // 切换后重新加载数据(如果有打开的数据库)
                     if (state.currentDatabase) {
                         await loadTables();
+                    }
+                };
+
+                // 切换语言菜单显示
+                const toggleLanguageMenu = () => {
+                    showLanguageMenu.value = !showLanguageMenu.value;
+                };
+
+                // 点击外部关闭菜单
+                const handleGlobalClick = (event) => {
+                    if (!event.target.closest('.language-switcher')) {
+                        showLanguageMenu.value = false;
                     }
                 };
 
@@ -999,8 +1022,11 @@
                     // i18n
                     locale,
                     isLoadingLocale,
+                    showLanguageMenu,  // 新增
                     t,
                     switchLocale,
+                    toggleLanguageMenu,  // 新增
+                    handleGlobalClick,  // 新增
                     // 应用状态
                     state,
                     fileBrowser,
@@ -1028,6 +1054,7 @@
                 };
             }
         }).mount('#app');
+        })();  // 结束 async IIFE
     </script>
 
 </body>

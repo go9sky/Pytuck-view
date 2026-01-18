@@ -35,6 +35,12 @@ class CommonUI:
     SEARCH = FrontendI18nMessage(zh_cn="搜索", en_us="Search")
     FILTER = FrontendI18nMessage(zh_cn="过滤", en_us="Filter")
     REFRESH = FrontendI18nMessage(zh_cn="刷新", en_us="Refresh")
+    SELECT_DATABASE_HINT = FrontendI18nMessage(
+        zh_cn="选择一个 pytuck 数据库文件开始浏览",
+        en_us="Select a pytuck database file to start browsing"
+    )
+    BACK = FrontendI18nMessage(zh_cn="返回", en_us="Back")
+    TABLES_COUNT = FrontendI18nMessage(zh_cn="张表", en_us="tables")
 
 
 class FileUI:
@@ -72,6 +78,22 @@ class TableUI:
     LOADING_TABLES = FrontendI18nMessage(
         zh_cn="正在加载表列表...", en_us="Loading tables..."
     )
+    DATA_TABLES = FrontendI18nMessage(zh_cn="数据表", en_us="Data Tables")
+    SELECT_TABLE_HINT = FrontendI18nMessage(
+        zh_cn="选择一个表开始浏览",
+        en_us="Select a table to start browsing"
+    )
+    ROWS_COUNT = FrontendI18nMessage(zh_cn="行数据", en_us="rows")
+    TAB_STRUCTURE = FrontendI18nMessage(zh_cn="结构", en_us="Structure")
+    TAB_DATA = FrontendI18nMessage(zh_cn="数据", en_us="Data")
+
+    # 表结构列表表头
+    COL_NAME = FrontendI18nMessage(zh_cn="列名", en_us="Column Name")
+    COL_TYPE = FrontendI18nMessage(zh_cn="数据类型", en_us="Data Type")
+    COL_NULLABLE = FrontendI18nMessage(zh_cn="允许空值", en_us="Nullable")
+    COL_PRIMARY_KEY = FrontendI18nMessage(zh_cn="主键", en_us="Primary Key")
+    COL_DEFAULT = FrontendI18nMessage(zh_cn="默认值", en_us="Default Value")
+    COL_COMMENT = FrontendI18nMessage(zh_cn="备注", en_us="Comment")
 
 
 class NavigationUI:
