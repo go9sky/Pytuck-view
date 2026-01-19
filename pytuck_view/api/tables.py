@@ -20,21 +20,30 @@ router = APIRouter()
 )
 @ResponseUtil(i18n_summary=ApiSummaryI18n.GET_TABLES)
 async def get_tables(file_id: str) -> SuccessResult[dict]:
-    """获取指定数据库的表列表"""
+    """获取指定数据库的表列表(包含备注信息)"""
     if file_id not in db_services:
         raise ServiceException(DatabaseI18n.DB_NOT_OPENED)
 
     db_service = db_services[file_id]
-    tables = db_service.list_tables()
+    table_names = db_service.list_tables()
 
-    placeholder_tables = [t for t in tables if t.startswith(("⚠️", "💡", "📋"))]
+    # 获取每个表的元数据(名称和备注)
+    tables_with_metadata = []
+    for table_name in table_names:
+        table_info = db_service.get_table_info(table_name)
+        tables_with_metadata.append({
+            "name": table_name,
+            "comment": table_info.comment if table_info else None
+        })
+
+    placeholder_tables = [t for t in table_names if t.startswith(("⚠️", "💡", "📋"))]
     if placeholder_tables:
         return SuccessResult(
-            data={"tables": tables, "has_placeholder": True},
+            data={"tables": tables_with_metadata, "has_placeholder": True},
             i18n_msg=DatabaseI18n.GET_TABLES_WITH_PLACEHOLDER,
         )
 
-    return SuccessResult(data={"tables": tables, "has_placeholder": False})
+    return SuccessResult(data={"tables": tables_with_metadata, "has_placeholder": False})
 
 
 @router.get(
@@ -58,6 +67,7 @@ async def get_table_schema(file_id: str, table_name: str) -> SuccessResult[dict]
         "table_name": table_info.name,
         "row_count": table_info.row_count,
         "columns": table_info.columns,
+        "table_comment": table_info.comment,
     }
 
     placeholder_columns = [

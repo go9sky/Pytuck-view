@@ -310,14 +310,15 @@
                 <aside class="sidebar">
                     <h3>📋 {{ t('table.dataTables') }}</h3>
                     <div class="table-list">
-                        <div v-for="table in state.tables" :key="table"
+                        <div v-for="table in state.tables" :key="table.name"
                              class="table-item"
                              :class="{
-                                active: state.currentTable === table,
-                                placeholder: table.startsWith('⚠️') || table.startsWith('💡') || table.startsWith('📋')
+                                active: state.currentTable === table.name,
+                                placeholder: table.name.startsWith('⚠️') || table.name.startsWith('💡') || table.name.startsWith('📋')
                              }"
-                             @click="selectTable(table)">
-                            {{ table }}
+                             @click="selectTable(table.name)">
+                            <div class="table-item-name">{{ table.name }}</div>
+                            <div v-if="table.comment" class="table-item-comment">{{ table.comment }}</div>
                         </div>
                     </div>
                 </aside>
@@ -331,8 +332,13 @@
                     <div v-else>
                         <!-- 表信息 -->
                         <div v-if="state.tableSchema" class="table-info">
-                            <h2>📊 {{ state.tableSchema.table_name }}</h2>
-                            <p>{{ state.tableSchema.row_count }} {{ t('table.rowsCount') }}</p>
+                            <div class="table-header">
+                                <h2>📊 {{ state.tableSchema.table_name }}</h2>
+                                <p v-if="state.tableSchema.table_comment" class="table-description">
+                                    {{ state.tableSchema.table_comment }}
+                                </p>
+                            </div>
+                            <p class="table-meta">{{ state.tableSchema.row_count }} {{ t('table.rowsCount') }}</p>
                         </div>
 
                         <!-- Tab -->

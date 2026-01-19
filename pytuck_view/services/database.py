@@ -25,6 +25,7 @@ class TableInfo:
     name: str
     row_count: int
     columns: list[dict[str, Any]]
+    comment: str | None = None
 
 
 @dataclass
@@ -213,10 +214,21 @@ class DatabaseService:
             columns = []
             row_count = 0
 
+        # 提取表备注
+        table_comment = None
+        try:
+            if hasattr(table, "comment"):
+                table_comment = str(table.comment) if table.comment else None
+            elif isinstance(table, dict) and "comment" in table:
+                table_comment = str(table["comment"]) if table["comment"] else None
+        except Exception as e:
+            logger.debug("提取表备注失败: %s", simplify_exception(e))
+
         return TableInfo(
             name=table_name,
             row_count=row_count,
             columns=columns if columns else self._get_placeholder_columns(),
+            comment=table_comment,
         )
 
     def _get_placeholder_table_info(self, table_name: str) -> TableInfo:
