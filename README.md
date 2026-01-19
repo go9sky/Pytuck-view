@@ -170,9 +170,7 @@ invoke clean
 
 ## 支持的文件格式
 
-- `.bin`：pytuck 二进制格式
-- `.json`：JSON 格式数据库
-- `.csv`：CSV 格式数据库
+- 不限格式，pytuck 数据库文件皆可
 
 ## 系统要求
 
