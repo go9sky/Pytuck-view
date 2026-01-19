@@ -455,7 +455,6 @@
 
                 <div class="file-browser-content">
                     <div v-if="fileBrowser.loading" style="text-align: center; padding: 40px;">
-                        加载中...
                     </div>
 
                     <ul v-else-if="fileBrowser.entries.length > 0" class="file-browser-list">
@@ -507,7 +506,7 @@
 
         <!-- 全局加载状态 -->
         <div v-if="state.loading" class="loading-overlay">
-            <div class="loading">加载中...</div>
+            <div class="loading"></div>
         </div>
     </div>
 
