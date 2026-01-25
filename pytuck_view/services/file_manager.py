@@ -25,8 +25,8 @@ class FileManager:
     """文件管理器"""
 
     def __init__(self) -> None:
-        # 配置文件存储在程序入口同级的 .pytuck-view 目录下
-        self.config_dir = Path.cwd() / ".pytuck-view"
+        # 配置文件存储在用户 home 目录下的 .pytuck-view 目录
+        self.config_dir = Path.home() / ".pytuck-view"
         self.config_file: Path | None = self.config_dir / "recent_files.json"
         self.open_files: dict[str, FileRecord] = {}  # 当前打开的文件
         self.temporary_files: dict[
