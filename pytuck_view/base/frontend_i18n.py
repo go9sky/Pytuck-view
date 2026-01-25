@@ -4,10 +4,11 @@
 应用启动时自动生成 JSON 文件到 static/locales/。
 """
 
+from typing import Any
+
 from pytuck_view.utils.schemas import I18nMessage
 
-
-ALL_UI_CLASSES: list[type['BaseUIClass']] = []
+ALL_UI_CLASSES: list[type["BaseUIClass"]] = []
 
 
 class BaseUIClass:
@@ -16,7 +17,8 @@ class BaseUIClass:
     所有包含前端翻译文本的类都应继承此基类，
     以便自动被收集到翻译生成流程中。
     """
-    def __init_subclass__(cls, **kwargs):
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
         ALL_UI_CLASSES.append(cls)
         super().__init_subclass__(**kwargs)
 
