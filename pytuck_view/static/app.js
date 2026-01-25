@@ -257,7 +257,7 @@ function createApiClient(state) {
                     state.currentPage = 'database-view';
                     await loadTables();
                 } catch (error) {
-                    state.error = `打开文件失败: ${error.message}`;
+                    state.error = `${t('error.openFileFailed')}: ${error.message}`;
                 } finally {
                     state.loading = false;
                 }
@@ -272,7 +272,7 @@ function createApiClient(state) {
                     }
                     await loadRecentFiles();
                 } catch (error) {
-                    state.error = `移除失败: ${error.message}`;
+                    state.error = `${t('error.removeFailed')}: ${error.message}`;
                 } finally {
                     state.loading = false;
                 }
@@ -286,7 +286,7 @@ function createApiClient(state) {
                     const data = await api('/last-browse-directory');
                     await browseTo(data.directory);
                 } catch (error) {
-                    state.error = `无法打开文件浏览器: ${error.message}`;
+                    state.error = `${t('error.cannotOpenFileBrowser')}: ${error.message}`;
                 } finally {
                     fileBrowser.loading = false;
                 }
@@ -354,7 +354,7 @@ function createApiClient(state) {
                     state.tableData = [];
                     state.totalRows = 0;
                 } catch (error) {
-                    state.error = `加载表数据失败: ${error.message}`;
+                    state.error = `${t('error.loadTableDataFailed')}: ${error.message}`;
                 } finally {
                     state.loading = false;
                 }

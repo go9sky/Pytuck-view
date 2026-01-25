@@ -125,3 +125,18 @@ class LanguageUI(BaseUIClass):
     CHINESE = I18nMessage(zh_cn="简体中文", en_us="Simplified Chinese")
     ENGLISH = I18nMessage(zh_cn="英文", en_us="English")
 
+
+class ErrorUI(BaseUIClass):
+    """错误消息 UI 文本"""
+
+    OPEN_FILE_FAILED = I18nMessage(
+        zh_cn="打开文件失败", en_us="Failed to open file"
+    )
+    REMOVE_FAILED = I18nMessage(zh_cn="移除失败", en_us="Failed to remove")
+    CANNOT_OPEN_FILE_BROWSER = I18nMessage(
+        zh_cn="无法打开文件浏览器", en_us="Cannot open file browser"
+    )
+    LOAD_TABLE_DATA_FAILED = I18nMessage(
+        zh_cn="加载表数据失败", en_us="Failed to load table data"
+    )
+
