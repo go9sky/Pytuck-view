@@ -20,7 +20,7 @@ class I18nMessage(BaseModel):
         """获取指定语言的消息模板"""
         return getattr(self, lang.lower(), self.zh_cn)
 
-    def format(self, lang: str, **kwargs):
+    def format(self, lang: str, **kwargs: str) -> str:
         """格式化消息模板"""
         template = self.get_template(lang)
         try:
