@@ -10,6 +10,7 @@ import os
 import uuid
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from pytuck.backends import is_valid_pytuck_database
 
@@ -21,17 +22,17 @@ from pytuck_view.utils.tiny_func import simplify_exception
 class FileManager:
     """文件管理器"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # 配置文件存储在程序入口同级的 .pytuck-view 目录下
         self.config_dir = Path.cwd() / ".pytuck-view"
-        self.config_file = self.config_dir / "recent_files.json"
+        self.config_file: Path | None = self.config_dir / "recent_files.json"
         self.open_files: dict[str, FileRecord] = {}  # 当前打开的文件
         self.temporary_files: dict[
             str, str
         ] = {}  # file_id -> 临时文件路径（仅内存，用于 upload-open 清理）
         self._ensure_config_dir()
 
-    def _ensure_config_dir(self):
+    def _ensure_config_dir(self) -> None:
         """确保配置目录存在"""
         try:
             self.config_dir.mkdir(exist_ok=True)
@@ -62,7 +63,7 @@ class FileManager:
             logger.warning("无法加载最近文件列表: %s", simplify_exception(e))
             return []
 
-    def _save_recent_files(self, files: list[FileRecord]):
+    def _save_recent_files(self, files: list[FileRecord]) -> None:
         """保存最近文件列表到 JSON 文件"""
         if not self.config_file:
             return  # 内存模式，不保存
@@ -120,7 +121,7 @@ class FileManager:
             name=path_obj.stem,
             last_opened=datetime.now().isoformat(),
             file_size=path_obj.stat().st_size,
-            engine_name=engine,
+            engine_name=engine or "unknown",
         )
 
         # 添加到当前打开的文件
@@ -131,7 +132,7 @@ class FileManager:
 
         return file_record
 
-    def _add_to_history(self, file_record: FileRecord):
+    def _add_to_history(self, file_record: FileRecord) -> None:
         """将文件记录添加到历史记录"""
         files = self._load_recent_files()
 
@@ -165,7 +166,7 @@ class FileManager:
         self._save_recent_files(new_files)
         return True
 
-    def close_file(self, file_id: str):
+    def close_file(self, file_id: str) -> None:
         """关闭文件"""
         self.open_files.pop(file_id, None)
 
@@ -196,14 +197,14 @@ class FileManager:
             pass
         return None
 
-    def update_last_browse_directory(self, directory: str):
+    def update_last_browse_directory(self, directory: str) -> None:
         """更新最后浏览的目录"""
         if not self.config_file:
             return
 
         try:
             # 读取现有数据
-            data = {"files": []}
+            data: dict[str, Any] = {"files": []}
             if self.config_file.exists():
                 with open(self.config_file, encoding="utf-8") as f:
                     existing_data = json.load(f)
@@ -222,14 +223,14 @@ class FileManager:
         except Exception as e:
             logger.warning("更新最后浏览目录失败: %s", simplify_exception(e))
 
-    def discover_files(self, directory: str | None = None) -> list[dict]:
+    def discover_files(self, directory: str | None = None) -> list[dict[str, Any]]:
         """在指定目录中发现 pytuck 文件"""
         target_dir = Path.cwd() / "databases" if directory is None else Path(directory)
 
         if not target_dir.exists() or not target_dir.is_dir():
             return []
 
-        discovered_files = []
+        discovered_files: list[dict[str, Any]] = []
 
         try:
             for file_path in target_dir.iterdir():
