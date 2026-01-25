@@ -96,22 +96,16 @@ class ResponseUtil[T]:
             "i18n_summary 参数必须是 I18nMessage 对象"
         )
         self.i18n_summary = i18n_summary
-        self.__lang = ""
-        self.__summary = ""
 
     @property
     def lang(self) -> str:
-        """获取当前语言"""
-        if not self.__lang:
-            self.__lang = get_current_lang()
-        return self.__lang
+        """获取当前语言（每次请求时实时获取，不缓存）"""
+        return get_current_lang()
 
     @property
     def summary(self) -> str:
-        """获取 summary"""
-        if not self.__summary:
-            self.__summary = self.i18n_summary.get_template(self.lang)
-        return self.__summary
+        """获取 summary（每次请求时实时获取，不缓存）"""
+        return self.i18n_summary.get_template(self.lang)
 
     def translate_exception(self, e: AppException) -> str:
         """异常消息翻译方法"""
