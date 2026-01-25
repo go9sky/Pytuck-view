@@ -3,10 +3,9 @@
 pytuck-view 应用入口点
 
 启动 uvicorn 服务器并自动打开浏览器
-使用随机端口，确保零冲突
+从固定端口 54540 开始，若占用则递增
 """
 
-import socket
 import sys
 import threading
 import time
@@ -18,16 +17,10 @@ from typing import Any
 import uvicorn
 
 from pytuck_view.utils.logger import init_logging, logger
-from pytuck_view.utils.tiny_func import simplify_exception
+from pytuck_view.utils.tiny_func import find_available_port, simplify_exception
 
-
-def find_free_port() -> int:
-    """找到一个可用的端口"""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("", 0))
-        s.listen(1)
-        port: int = s.getsockname()[1]
-    return port
+# 默认起始端口
+DEFAULT_PORT = 54540
 
 
 def open_browser(url: str, delay: float = 1.5) -> None:
@@ -58,8 +51,8 @@ def main() -> None:
     init_logging()
 
     try:
-        # 查找可用端口
-        port = find_free_port()
+        # 查找可用端口（从 54540 开始）
+        port = find_available_port(DEFAULT_PORT)
         url = f"http://localhost:{port}"
 
         logger.info("📊 pytuck-view v%s", __import__("pytuck_view").__version__)
