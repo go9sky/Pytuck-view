@@ -535,11 +535,10 @@ wheels = [
 
 [[package]]
 name = "pytuck"
-version = "0.5.0"
+version = "0.6.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/1e/6b/e6b3c3ada1d70e5413b7bf62281072e9f1483fb78805863e049dd7e8d98f/pytuck-0.5.0.tar.gz", hash = "sha256:83a6d9a2acb56bb87344279a87a9ede9691b45bb74c0e4a8318308a742e34c5e", size = 148023, upload-time = "2026-01-25T11:08:39.46Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/68/6f/b4a0670296f98fc3939a2eacec9f5464cc33d3fff1b29d5850e6ad2533b5/pytuck-0.5.0-py3-none-any.whl", hash = "sha256:027a8d17c7ab8b88a6ea73ebbaf922c4b21fd40f065e2719b1cde711f1afd04e", size = 132711, upload-time = "2026-01-25T11:08:37.807Z" },
+    { url = "https://files.pythonhosted.org/packages/23/24/560f993b65aaa09f74b32082c49d3d6445490506fe44d2156901464a689b/pytuck-0.6.1-py3-none-any.whl", hash = "sha256:40878640512d1be236d86fb7cea83ceb158bf9fbd8324be242695a6a9d45ad6e", size = 140906, upload-time = "2026-01-29T15:05:18.551Z" },
 ]
 
 [package.optional-dependencies]
@@ -558,6 +557,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "pydantic" },
     { name = "pytuck", extra = ["all"] },
+    { name = "setuptools" },
     { name = "uvicorn" },
 ]
 
@@ -579,7 +579,8 @@ dev = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.128.0" },
     { name = "pydantic", specifier = ">=2.12.5" },
-    { name = "pytuck", extras = ["all"], specifier = ">=0.5.0" },
+    { name = "pytuck", extras = ["all"], specifier = ">=0.6.1" },
+    { name = "setuptools", specifier = ">=80.9.0" },
     { name = "uvicorn", specifier = ">=0.20.0" },
 ]
 
