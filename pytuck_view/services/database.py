@@ -47,9 +47,7 @@ def _extract_column_from_object(col_name: str, col_obj: Any) -> dict[str, Any]:
     """从列对象中提取列信息（字典格式的列定义）"""
     return {
         "name": str(col_name),
-        "type": str(
-            getattr(col_obj, "col_type", getattr(col_obj, "type", "unknown"))
-        ),
+        "type": str(getattr(col_obj, "col_type", getattr(col_obj, "type", "unknown"))),
         "nullable": bool(getattr(col_obj, "nullable", True)),
         "primary_key": bool(getattr(col_obj, "primary_key", False)),
         "default_value": (
@@ -401,9 +399,7 @@ class DatabaseService:
         filters_dict: dict[str, Any] | None = None
         if filters:
             filters_dict = {
-                f.get("field", ""): f.get("value")
-                for f in filters
-                if f.get("field")
+                f.get("field", ""): f.get("value") for f in filters if f.get("field")
             }
 
         return self.storage.query_table_data(
@@ -450,9 +446,7 @@ class DatabaseService:
             return [self._serialize_value(item) for item in value]
         elif isinstance(value, dict):
             return {
-                k: self._serialize_value(v)
-                for k, v in value.items()
-                if not callable(v)
+                k: self._serialize_value(v) for k, v in value.items() if not callable(v)
             }
         elif hasattr(value, "__dict__"):
             # 对象转字典
@@ -547,3 +541,205 @@ class DatabaseService:
             }
         except Exception as e:
             return {"error": f"获取数据库信息失败: {e}", "status": "error"}
+
+    # ========== Schema 修改操作 ==========
+
+    def get_primary_key_column(self, table_name: str) -> str | None:
+        """获取表的主键列名
+
+        Args:
+            table_name: 表名
+
+        Returns:
+            主键列名，如果没有主键则返回 None
+        """
+        if not self.storage:
+            raise RuntimeError("数据库未打开")
+
+        try:
+            table = self.storage.get_table(table_name)
+            return table.primary_key
+        except Exception as e:
+            logger.error("获取主键列失败 %s: %s", table_name, simplify_exception(e))
+            return None
+
+    def rename_table(self, old_name: str, new_name: str) -> None:
+        """重命名表
+
+        Args:
+            old_name: 原表名
+            new_name: 新表名
+
+        Raises:
+            RuntimeError: 数据库未打开
+            ServiceException: 重命名失败
+        """
+        if not self.storage:
+            raise RuntimeError("数据库未打开")
+
+        try:
+            self.storage.rename_table(old_name, new_name)
+            self.storage.flush()
+        except Exception as e:
+            logger.error(
+                "重命名表失败 %s -> %s: %s", old_name, new_name, simplify_exception(e)
+            )
+            raise ServiceException(
+                FileI18n.CANNOT_OPEN_FILE,  # 临时使用，后续添加专用消息
+                error=str(e),
+            ) from e
+
+    def update_table_comment(self, table_name: str, comment: str | None) -> None:
+        """更新表备注
+
+        Args:
+            table_name: 表名
+            comment: 新备注（None 表示清空）
+
+        Raises:
+            RuntimeError: 数据库未打开
+            ServiceException: 更新失败
+        """
+        if not self.storage:
+            raise RuntimeError("数据库未打开")
+
+        try:
+            self.storage.update_table_comment(table_name, comment)
+            self.storage.flush()
+        except Exception as e:
+            logger.error("更新表备注失败 %s: %s", table_name, simplify_exception(e))
+            raise ServiceException(
+                FileI18n.CANNOT_OPEN_FILE,
+                error=str(e),
+            ) from e
+
+    def update_column_comment(
+        self, table_name: str, column_name: str, comment: str | None
+    ) -> None:
+        """更新列备注
+
+        Args:
+            table_name: 表名
+            column_name: 列名
+            comment: 新备注（None 表示清空）
+
+        Raises:
+            RuntimeError: 数据库未打开
+            ServiceException: 更新失败
+        """
+        if not self.storage:
+            raise RuntimeError("数据库未打开")
+
+        try:
+            self.storage.update_column(table_name, column_name, comment=comment)
+            self.storage.flush()
+        except Exception as e:
+            logger.error(
+                "更新列备注失败 %s.%s: %s",
+                table_name,
+                column_name,
+                simplify_exception(e),
+            )
+            raise ServiceException(
+                FileI18n.CANNOT_OPEN_FILE,
+                error=str(e),
+            ) from e
+
+    # ========== 数据行操作 ==========
+
+    def insert_row(self, table_name: str, data: dict[str, Any]) -> Any:
+        """插入一行数据
+
+        Args:
+            table_name: 表名
+            data: 行数据
+
+        Returns:
+            插入的主键值
+
+        Raises:
+            RuntimeError: 数据库未打开
+            ServiceException: 插入失败
+        """
+        if not self.storage:
+            raise RuntimeError("数据库未打开")
+
+        try:
+            pk = self.storage.insert(table_name, data)
+            self.storage.flush()
+            return pk
+        except Exception as e:
+            logger.error("插入数据失败 %s: %s", table_name, simplify_exception(e))
+            raise ServiceException(
+                FileI18n.CANNOT_OPEN_FILE,
+                error=str(e),
+            ) from e
+
+    def update_row(self, table_name: str, pk: Any, data: dict[str, Any]) -> None:
+        """更新一行数据
+
+        Args:
+            table_name: 表名
+            pk: 主键值
+            data: 要更新的数据
+
+        Raises:
+            RuntimeError: 数据库未打开
+            ServiceException: 更新失败或表没有主键
+        """
+        if not self.storage:
+            raise RuntimeError("数据库未打开")
+
+        # 检查表是否有主键
+        pk_col = self.get_primary_key_column(table_name)
+        if pk_col is None:
+            raise ServiceException(
+                FileI18n.CANNOT_OPEN_FILE,
+                error="该表没有主键，无法更新数据",
+            )
+
+        try:
+            self.storage.update(table_name, pk, data)
+            self.storage.flush()
+        except Exception as e:
+            logger.error(
+                "更新数据失败 %s[%s]: %s", table_name, pk, simplify_exception(e)
+            )
+            raise ServiceException(
+                FileI18n.CANNOT_OPEN_FILE,
+                error=str(e),
+            ) from e
+
+    def delete_row(self, table_name: str, pk: Any) -> None:
+        """删除一行数据
+
+        Args:
+            table_name: 表名
+            pk: 主键值
+
+        Raises:
+            RuntimeError: 数据库未打开
+            ServiceException: 删除失败或表没有主键
+        """
+        if not self.storage:
+            raise RuntimeError("数据库未打开")
+
+        # 检查表是否有主键
+        pk_col = self.get_primary_key_column(table_name)
+        if pk_col is None:
+            raise ServiceException(
+                FileI18n.CANNOT_OPEN_FILE,
+                error="该表没有主键，无法删除数据",
+            )
+
+        try:
+            self.storage.delete(table_name, pk)
+            self.storage.flush()
+        except Exception as e:
+            logger.error(
+                "删除数据失败 %s[%s]: %s", table_name, pk, simplify_exception(e)
+            )
+            raise ServiceException(
+                FileI18n.CANNOT_OPEN_FILE,
+                error=str(e),
+            ) from e
