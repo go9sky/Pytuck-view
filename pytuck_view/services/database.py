@@ -15,7 +15,7 @@ from pytuck import Session, Storage
 from pytuck.backends import is_valid_pytuck_database
 
 from pytuck_view.base.exceptions import ServiceException
-from pytuck_view.base.i18n import FileI18n
+from pytuck_view.base.i18n import DatabaseI18n, FileI18n
 from pytuck_view.utils.logger import logger
 from pytuck_view.utils.tiny_func import simplify_exception
 
@@ -113,12 +113,26 @@ def _get_row_count_from_table(
     elif hasattr(table, "data") and table.data:
         # 其他格式使用 data
         return len(table.data)
-    elif hasattr(storage, "count_rows") and storage is not None:
-        # 假设将来会有这个方法
+
+    # 尝试使用 storage 的 connector 直接查询（针对 SQLite 等原生 SQL 模式）
+    if storage is not None:
         try:
-            return int(storage.count_rows(table_name))
+            connector = getattr(storage, "_connector", None)
+            if connector and hasattr(connector, "execute"):
+                cursor = connector.execute(f"SELECT COUNT(*) FROM `{table_name}`")
+                result = cursor.fetchone()
+                if result:
+                    return int(result[0])
         except Exception:
-            return 0
+            pass
+
+        # 后备方案：尝试 count_rows 方法
+        if hasattr(storage, "count_rows"):
+            try:
+                return int(storage.count_rows(table_name))
+            except Exception:
+                pass
+
     return 0
 
 
@@ -254,7 +268,7 @@ class DatabaseService:
             return True
 
         except Exception as e:
-            logger.error("打开数据库失败: %s", simplify_exception(e))
+            logger.error(f"打开数据库失败: {simplify_exception(e)}")
             return False
 
     def list_tables(self) -> list[str]:
@@ -271,7 +285,7 @@ class DatabaseService:
                 return _get_placeholder_tables()
 
         except Exception as e:
-            logger.error("获取表列表失败: %s", simplify_exception(e))
+            logger.error(f"获取表列表失败: {simplify_exception(e)}")
             return _get_placeholder_tables()
 
     def get_table_info(self, table_name: str) -> TableInfo | None:
@@ -306,7 +320,7 @@ class DatabaseService:
             return self._get_placeholder_table_info(table_name)
 
         except Exception as e:
-            logger.error("获取表信息失败 %s: %s", table_name, simplify_exception(e))
+            logger.error(f"获取表信息失败 {table_name}: {simplify_exception(e)}")
             return self._get_placeholder_table_info(table_name)
 
     def _extract_table_info(self, table: Any, table_name: str) -> TableInfo:
@@ -315,7 +329,7 @@ class DatabaseService:
             columns = _extract_columns_from_table(table)
             row_count = _get_row_count_from_table(table, self.storage, table_name)
         except Exception as e:
-            logger.error("提取表信息失败: %s", simplify_exception(e))
+            logger.error(f"提取表信息失败: {simplify_exception(e)}")
             columns = []
             row_count = 0
 
@@ -355,10 +369,8 @@ class DatabaseService:
             serialized_rows = [self._serialize_value(row) for row in rows]
 
             logger.debug(
-                "使用服务端分页查询 %s，返回 %d 行，总计 %d 行",
-                table_name,
-                len(serialized_rows),
-                total,
+                f"使用服务端分页查询 {table_name}，"
+                f"返回 {len(serialized_rows)} 行，总计 {total} 行"
             )
 
             return {
@@ -370,7 +382,7 @@ class DatabaseService:
             }
 
         except Exception as e:
-            logger.error("获取表数据失败 %s: %s", table_name, simplify_exception(e))
+            logger.error(f"获取表数据失败 {table_name}: {simplify_exception(e)}")
             return {
                 "rows": _get_placeholder_data(),
                 "total": 1,
@@ -560,7 +572,7 @@ class DatabaseService:
             table = self.storage.get_table(table_name)
             return table.primary_key
         except Exception as e:
-            logger.error("获取主键列失败 %s: %s", table_name, simplify_exception(e))
+            logger.error(f"获取主键列失败 {table_name}: {simplify_exception(e)}")
             return None
 
     def rename_table(self, old_name: str, new_name: str) -> None:
@@ -582,11 +594,11 @@ class DatabaseService:
             self.storage.flush()
         except Exception as e:
             logger.error(
-                "重命名表失败 %s -> %s: %s", old_name, new_name, simplify_exception(e)
+                f"重命名表失败 {old_name} -> {new_name}: {simplify_exception(e)}"
             )
             raise ServiceException(
-                FileI18n.CANNOT_OPEN_FILE,  # 临时使用，后续添加专用消息
-                error=str(e),
+                DatabaseI18n.RENAME_TABLE_FAILED,
+                error=simplify_exception(e),
             ) from e
 
     def update_table_comment(self, table_name: str, comment: str | None) -> None:
@@ -607,10 +619,10 @@ class DatabaseService:
             self.storage.update_table_comment(table_name, comment)
             self.storage.flush()
         except Exception as e:
-            logger.error("更新表备注失败 %s: %s", table_name, simplify_exception(e))
+            logger.error(f"更新表备注失败 {table_name}: {simplify_exception(e)}")
             raise ServiceException(
-                FileI18n.CANNOT_OPEN_FILE,
-                error=str(e),
+                DatabaseI18n.UPDATE_COMMENT_FAILED,
+                error=simplify_exception(e),
             ) from e
 
     def update_column_comment(
@@ -635,14 +647,11 @@ class DatabaseService:
             self.storage.flush()
         except Exception as e:
             logger.error(
-                "更新列备注失败 %s.%s: %s",
-                table_name,
-                column_name,
-                simplify_exception(e),
+                f"更新列备注失败 {table_name}.{column_name}: {simplify_exception(e)}"
             )
             raise ServiceException(
-                FileI18n.CANNOT_OPEN_FILE,
-                error=str(e),
+                DatabaseI18n.UPDATE_COMMENT_FAILED,
+                error=simplify_exception(e),
             ) from e
 
     # ========== 数据行操作 ==========
@@ -669,10 +678,10 @@ class DatabaseService:
             self.storage.flush()
             return pk
         except Exception as e:
-            logger.error("插入数据失败 %s: %s", table_name, simplify_exception(e))
+            logger.error(f"插入数据失败 {table_name}: {simplify_exception(e)}")
             raise ServiceException(
-                FileI18n.CANNOT_OPEN_FILE,
-                error=str(e),
+                DatabaseI18n.INSERT_FAILED,
+                error=simplify_exception(e),
             ) from e
 
     def update_row(self, table_name: str, pk: Any, data: dict[str, Any]) -> None:
@@ -693,21 +702,16 @@ class DatabaseService:
         # 检查表是否有主键
         pk_col = self.get_primary_key_column(table_name)
         if pk_col is None:
-            raise ServiceException(
-                FileI18n.CANNOT_OPEN_FILE,
-                error="该表没有主键，无法更新数据",
-            )
+            raise ServiceException(DatabaseI18n.NO_PRIMARY_KEY)
 
         try:
             self.storage.update(table_name, pk, data)
             self.storage.flush()
         except Exception as e:
-            logger.error(
-                "更新数据失败 %s[%s]: %s", table_name, pk, simplify_exception(e)
-            )
+            logger.error(f"更新数据失败 {table_name}[{pk}]: {simplify_exception(e)}")
             raise ServiceException(
-                FileI18n.CANNOT_OPEN_FILE,
-                error=str(e),
+                DatabaseI18n.UPDATE_FAILED,
+                error=simplify_exception(e),
             ) from e
 
     def delete_row(self, table_name: str, pk: Any) -> None:
@@ -727,19 +731,14 @@ class DatabaseService:
         # 检查表是否有主键
         pk_col = self.get_primary_key_column(table_name)
         if pk_col is None:
-            raise ServiceException(
-                FileI18n.CANNOT_OPEN_FILE,
-                error="该表没有主键，无法删除数据",
-            )
+            raise ServiceException(DatabaseI18n.NO_PRIMARY_KEY)
 
         try:
             self.storage.delete(table_name, pk)
             self.storage.flush()
         except Exception as e:
-            logger.error(
-                "删除数据失败 %s[%s]: %s", table_name, pk, simplify_exception(e)
-            )
+            logger.error(f"删除数据失败 {table_name}[{pk}]: {simplify_exception(e)}")
             raise ServiceException(
-                FileI18n.CANNOT_OPEN_FILE,
-                error=str(e),
+                DatabaseI18n.DELETE_FAILED,
+                error=simplify_exception(e),
             ) from e
