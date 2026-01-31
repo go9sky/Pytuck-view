@@ -17,7 +17,9 @@ class I18nMessage(BaseModel):
     - key 字段用于前端国际化，后端使用时可不填
     """
 
-    key: str | None = Field(default=None, description="前端国际化 key（不含 prefix），后端可不填")
+    key: str | None = Field(
+        default=None, description="前端国际化 key（不含 prefix），后端可不填"
+    )
     zh_cn: str = Field(..., description="中文消息模板")
     en_us: str = Field(..., description="英文消息模板")
 
