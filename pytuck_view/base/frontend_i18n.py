@@ -59,6 +59,7 @@ class CommonUI(BaseUIClass):
 
     OPEN = I18nMessage(key="open", zh_cn="打开", en_us="Open")
     CLOSE = I18nMessage(key="close", zh_cn="关闭", en_us="Close")
+    COPY = I18nMessage(key="copy", zh_cn="复制", en_us="Copy")
     CONFIRM = I18nMessage(key="confirm", zh_cn="确认", en_us="Confirm")
     CANCEL = I18nMessage(key="cancel", zh_cn="取消", en_us="Cancel")
     BROWSE = I18nMessage(key="browse", zh_cn="浏览", en_us="Browse")
