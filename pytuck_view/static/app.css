@@ -557,6 +557,39 @@ body {
     font-family: 'Consolas', 'Monaco', monospace;
 }
 
+/* 列备注单元格 - 固定宽度防止编辑时布局抖动 */
+.col-comment-cell {
+    position: relative;
+    min-width: 180px;
+    max-width: 300px;
+    width: 180px;
+}
+
+.col-comment-display {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 24px;
+}
+
+.col-comment-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.col-comment-edit {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.col-comment-edit .edit-input {
+    width: 140px;
+    min-width: 100px;
+}
+
 .pk-badge {
     font-size: 16px;
 }

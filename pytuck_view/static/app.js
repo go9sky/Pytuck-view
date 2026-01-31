@@ -478,7 +478,7 @@ function createApiClient(state) {
             async function saveTableName() {
                 if (!state.currentDatabase || !state.currentTable) return;
                 if (!state.editTableNameValue.trim()) {
-                    state.error = '表名不能为空';
+                    state.error = t('dataEdit.tableNameRequired');
                     return;
                 }
                 if (state.editTableNameValue === state.currentTable) {
@@ -488,6 +488,7 @@ function createApiClient(state) {
 
                 try {
                     state.loading = true;
+                    state.error = null;
                     await api(`/tables/${state.currentDatabase.file_id}/${state.currentTable}/rename`, {
                         method: 'POST',
                         body: JSON.stringify({ new_name: state.editTableNameValue })
@@ -498,7 +499,7 @@ function createApiClient(state) {
                     await loadTables();
                     await loadTableSchema(newName);
                 } catch (error) {
-                    state.error = `重命名失败: ${error.message}`;
+                    state.error = `${t('dataEdit.renameFailed')}: ${error.message}`;
                 } finally {
                     state.loading = false;
                 }
@@ -519,6 +520,7 @@ function createApiClient(state) {
 
                 try {
                     state.loading = true;
+                    state.error = null;
                     await api(`/tables/${state.currentDatabase.file_id}/${state.currentTable}/comment`, {
                         method: 'POST',
                         body: JSON.stringify({ comment: state.editTableCommentValue || null })
@@ -527,7 +529,7 @@ function createApiClient(state) {
                     await loadTables();
                     await loadTableSchema(state.currentTable);
                 } catch (error) {
-                    state.error = `更新备注失败: ${error.message}`;
+                    state.error = `${t('dataEdit.saveCommentFailed')}: ${error.message}`;
                 } finally {
                     state.loading = false;
                 }
@@ -548,6 +550,7 @@ function createApiClient(state) {
 
                 try {
                     state.loading = true;
+                    state.error = null;
                     await api(`/columns/${state.currentDatabase.file_id}/${state.currentTable}/${columnName}/comment`, {
                         method: 'POST',
                         body: JSON.stringify({ comment: state.editColumnCommentValue || null })
@@ -555,7 +558,7 @@ function createApiClient(state) {
                     cancelEditColumnComment();
                     await loadTableSchema(state.currentTable);
                 } catch (error) {
-                    state.error = `更新列备注失败: ${error.message}`;
+                    state.error = `${t('dataEdit.saveCommentFailed')}: ${error.message}`;
                 } finally {
                     state.loading = false;
                 }
@@ -569,7 +572,7 @@ function createApiClient(state) {
 
             function startEditRow(index) {
                 if (!state.hasPrimaryKey) {
-                    state.error = '该表没有主键，无法编辑数据';
+                    state.error = t('dataEdit.noPkCannotEdit');
                     return;
                 }
                 state.editRowIndex = index;
@@ -584,7 +587,7 @@ function createApiClient(state) {
             async function saveEditRow() {
                 if (!state.currentDatabase || !state.currentTable || state.editBuffer === null) return;
                 if (!state.hasPrimaryKey || !state.primaryKeyColumn) {
-                    state.error = '该表没有主键，无法保存';
+                    state.error = t('dataEdit.noPkCannotSave');
                     return;
                 }
 
@@ -592,6 +595,7 @@ function createApiClient(state) {
 
                 try {
                     state.loading = true;
+                    state.error = null;
                     await api(`/rows/${state.currentDatabase.file_id}/${state.currentTable}`, {
                         method: 'PUT',
                         body: JSON.stringify({ pk: pkValue, data: state.editBuffer })
@@ -599,7 +603,7 @@ function createApiClient(state) {
                     cancelEditRow();
                     await loadTableData(state.currentTable, state.currentPageNum);
                 } catch (error) {
-                    state.error = `保存失败: ${error.message}`;
+                    state.error = `${t('dataEdit.updateFailed')}: ${error.message}`;
                 } finally {
                     state.loading = false;
                 }
@@ -608,29 +612,33 @@ function createApiClient(state) {
             async function deleteRow(index) {
                 if (!state.currentDatabase || !state.currentTable) return;
                 if (!state.hasPrimaryKey || !state.primaryKeyColumn) {
-                    state.error = '该表没有主键，无法删除';
+                    state.error = t('dataEdit.noPkCannotDelete');
                     return;
                 }
 
                 const pkValue = state.tableData[index][state.primaryKeyColumn];
-                if (!confirm(`确定要删除这条记录吗？\n主键: ${pkValue}`)) return;
+                if (!confirm(`${t('dataEdit.confirmDelete')}\n${t('dataEdit.primaryKey')}: ${pkValue}`)) return;
 
                 try {
                     state.loading = true;
+                    state.error = null;
                     await api(`/rows/${state.currentDatabase.file_id}/${state.currentTable}`, {
                         method: 'DELETE',
                         body: JSON.stringify({ pk: pkValue })
                     });
                     await loadTableData(state.currentTable, state.currentPageNum);
+                    await loadTableSchema(state.currentTable);
                     state.selectedRowIndex = null;
                 } catch (error) {
-                    state.error = `删除失败: ${error.message}`;
+                    state.error = `${t('dataEdit.deleteFailed')}: ${error.message}`;
                 } finally {
                     state.loading = false;
                 }
             }
 
             function startAddRow() {
+                // 切换到表格视图以显示新增表单
+                state.viewMode = 'table';
                 state.isAddingRow = true;
                 state.newRowData = {};
                 // 初始化默认值
@@ -655,14 +663,20 @@ function createApiClient(state) {
 
                 try {
                     state.loading = true;
+                    state.error = null;  // 清除之前的错误
                     await api(`/rows/${state.currentDatabase.file_id}/${state.currentTable}`, {
                         method: 'POST',
                         body: JSON.stringify({ data: state.newRowData })
                     });
                     cancelAddRow();
+                    // 新增成功后切换到表格视图并刷新数据
+                    state.viewMode = 'table';
                     await loadTableData(state.currentTable, state.currentPageNum);
+                    // 重新加载表结构以更新行数
+                    await loadTableSchema(state.currentTable);
                 } catch (error) {
-                    state.error = `插入失败: ${error.message}`;
+                    // 错误在 api 函数中已设置 state.error，这里保持在当前页面
+                    state.error = `${t('dataEdit.insertFailed')}: ${error.message}`;
                 } finally {
                     state.loading = false;
                 }
@@ -671,6 +685,14 @@ function createApiClient(state) {
             // ========== 视图模式切换 ==========
 
             function switchViewMode(mode) {
+                // 切换视图时取消正在进行的新增操作
+                if (state.isAddingRow) {
+                    cancelAddRow();
+                }
+                // 取消正在进行的编辑操作
+                if (state.editRowIndex !== null) {
+                    cancelEditRow();
+                }
                 state.viewMode = mode;
                 // 切换到记录视图时，确保有选中的行
                 if (mode === 'record' && state.selectedRowIndex === null && state.tableData.length > 0) {
@@ -692,7 +714,7 @@ function createApiClient(state) {
 
             function startEditRecord() {
                 if (!state.hasPrimaryKey) {
-                    state.error = '该表没有主键，无法编辑数据';
+                    state.error = t('dataEdit.noPkCannotEdit');
                     return;
                 }
                 if (state.selectedRowIndex === null) return;
@@ -708,7 +730,7 @@ function createApiClient(state) {
             async function saveEditRecord() {
                 if (!state.currentDatabase || !state.currentTable || state.editBuffer === null) return;
                 if (!state.hasPrimaryKey || !state.primaryKeyColumn) {
-                    state.error = '该表没有主键，无法保存';
+                    state.error = t('dataEdit.noPkCannotSave');
                     return;
                 }
 
@@ -716,6 +738,7 @@ function createApiClient(state) {
 
                 try {
                     state.loading = true;
+                    state.error = null;
                     await api(`/rows/${state.currentDatabase.file_id}/${state.currentTable}`, {
                         method: 'PUT',
                         body: JSON.stringify({ pk: pkValue, data: state.editBuffer })
@@ -723,7 +746,7 @@ function createApiClient(state) {
                     cancelEditRecord();
                     await loadTableData(state.currentTable, state.currentPageNum);
                 } catch (error) {
-                    state.error = `保存失败: ${error.message}`;
+                    state.error = `${t('dataEdit.updateFailed')}: ${error.message}`;
                 } finally {
                     state.loading = false;
                 }
@@ -731,7 +754,32 @@ function createApiClient(state) {
 
             async function deleteRecord() {
                 if (state.selectedRowIndex === null) return;
-                await deleteRow(state.selectedRowIndex);
+                if (!state.currentDatabase || !state.currentTable) return;
+                if (!state.hasPrimaryKey || !state.primaryKeyColumn) {
+                    state.error = t('dataEdit.noPkCannotDelete');
+                    return;
+                }
+
+                const pkValue = state.tableData[state.selectedRowIndex][state.primaryKeyColumn];
+                if (!confirm(`${t('dataEdit.confirmDelete')}\n${t('dataEdit.primaryKey')}: ${pkValue}`)) return;
+
+                try {
+                    state.loading = true;
+                    state.error = null;
+                    await api(`/rows/${state.currentDatabase.file_id}/${state.currentTable}`, {
+                        method: 'DELETE',
+                        body: JSON.stringify({ pk: pkValue })
+                    });
+                    // 删除成功后切换回表格视图
+                    state.viewMode = 'table';
+                    state.selectedRowIndex = null;
+                    await loadTableData(state.currentTable, state.currentPageNum);
+                    await loadTableSchema(state.currentTable);
+                } catch (error) {
+                    state.error = `${t('dataEdit.deleteFailed')}: ${error.message}`;
+                } finally {
+                    state.loading = false;
+                }
             }
 
             // ========== 导航操作 ==========

@@ -25,7 +25,7 @@
                 :aria-disabled="isLoadingLocale"
                 :class="{ disabled: isLoadingLocale }"
             >
-                <title>语言切换</title>
+                <title>语言/Language</title>
                 <path d="M12.65,15.67 C12.79,15.31 12.7,14.9 12.42,14.62 L10.33,12.56 L10.36,12.53 C12.1,10.59 13.34,8.36 14.07,6 L16.01,6 C16.55,6 17,5.55 17,5.01 L17,4.99 C17,4.45 16.55,4 16.01,4 L10,4 L10,3 C10,2.45 9.55,2 9,2 C8.45,2 8,2.45 8,3 L8,4 L1.99,4 C1.45,4 1,4.45 1,4.99 C1,5.54 1.45,5.98 1.99,5.98 L12.17,5.98 C11.5,7.92 10.44,9.75 9,11.35 C8.19,10.46 7.51,9.49 6.94,8.47 C6.78,8.18 6.49,8 6.16,8 C5.47,8 5.03,8.75 5.37,9.35 C6,10.48 6.77,11.56 7.67,12.56 L3.3,16.87 C2.9,17.26 2.9,17.9 3.3,18.29 C3.69,18.68 4.32,18.68 4.72,18.29 L9,14 L11.02,16.02 C11.53,16.53 12.4,16.34 12.65,15.67 Z M17.5,10 C16.9,10 16.36,10.37 16.15,10.94 L12.48,20.74 C12.24,21.35 12.7,22 13.35,22 C13.74,22 14.09,21.76 14.23,21.39 L15.12,19 L19.87,19 L20.77,21.39 C20.91,21.75 21.26,22 21.65,22 C22.3,22 22.76,21.35 22.53,20.74 L18.86,10.94 C18.64,10.37 18.1,10 17.5,10 Z M15.88,17 L17.5,12.67 L19.12,17 L15.88,17 Z" fill="currentColor"/>
             </svg>
             <span v-if="isLoadingLocale" class="loading-indicator loading-overlay-icon">⏳</span>
@@ -82,7 +82,7 @@
                                 <span class="file-card-name">{{ file.name }}</span>
                                 <span v-if="file.engine_name" class="engine-tag">{{ file.engine_name }}</span>
                             </div>
-                            <button class="file-card-remove" title="移除" @click.stop="removeHistory(file.file_id)">×</button>
+                            <button class="file-card-remove" :title="t('dataEdit.remove')" @click.stop="removeHistory(file.file_id)">×</button>
                         </div>
                         <div class="file-card-path">{{ file.path }}</div>
                         <div class="file-card-meta">
@@ -113,6 +113,12 @@
             <div v-if="state.placeholderWarning" class="warning">
                 ⚠️ {{ state.placeholderWarning }}
                 <button @click="state.placeholderWarning = null">×</button>
+            </div>
+
+            <!-- 错误提示（数据库页面） -->
+            <div v-if="state.error" class="error">
+                ❌ {{ state.error }}
+                <button @click="state.error = null">×</button>
             </div>
 
             <div class="main-content">
@@ -147,7 +153,7 @@
                                 <div class="table-name-row">
                                     <template v-if="!state.editingTableName">
                                         <h2>📊 {{ state.tableSchema.table_name }}</h2>
-                                        <button class="btn-icon" @click="startEditTableName" title="编辑表名">✏️</button>
+                                        <button class="btn-icon" @click="startEditTableName" :title="t('dataEdit.editTableName')">✏️</button>
                                     </template>
                                     <template v-else>
                                         <input
@@ -156,8 +162,8 @@
                                             @keyup.enter="saveTableName"
                                             @keyup.escape="cancelEditTableName"
                                         />
-                                        <button class="btn-icon btn-save" @click="saveTableName" title="保存">✓</button>
-                                        <button class="btn-icon btn-cancel" @click="cancelEditTableName" title="取消">✕</button>
+                                        <button class="btn-icon btn-save" @click="saveTableName" :title="t('dataEdit.save')">✓</button>
+                                        <button class="btn-icon btn-cancel" @click="cancelEditTableName" :title="t('common.cancel')">✕</button>
                                     </template>
                                 </div>
                                 <!-- 表备注编辑 -->
@@ -165,29 +171,29 @@
                                     <template v-if="!state.editingTableComment">
                                         <p v-if="state.tableSchema.table_comment" class="table-description">
                                             {{ state.tableSchema.table_comment }}
-                                            <button class="btn-icon btn-small" @click="startEditTableComment" title="编辑备注">✏️</button>
+                                            <button class="btn-icon btn-small" @click="startEditTableComment" :title="t('dataEdit.editComment')">✏️</button>
                                         </p>
                                         <p v-else class="table-description table-description-empty">
-                                            <span class="text-muted">无备注</span>
-                                            <button class="btn-icon btn-small" @click="startEditTableComment" title="添加备注">+</button>
+                                            <span class="text-muted">{{ t('dataEdit.noComment') }}</span>
+                                            <button class="btn-icon btn-small" @click="startEditTableComment" :title="t('dataEdit.addComment')">+</button>
                                         </p>
                                     </template>
                                     <template v-else>
                                         <input
                                             v-model="state.editTableCommentValue"
                                             class="edit-input"
-                                            placeholder="输入表备注..."
+                                            :placeholder="t('dataEdit.inputTableComment')"
                                             @keyup.enter="saveTableComment"
                                             @keyup.escape="cancelEditTableComment"
                                         />
-                                        <button class="btn-icon btn-save" @click="saveTableComment" title="保存">✓</button>
-                                        <button class="btn-icon btn-cancel" @click="cancelEditTableComment" title="取消">✕</button>
+                                        <button class="btn-icon btn-save" @click="saveTableComment" :title="t('dataEdit.save')">✓</button>
+                                        <button class="btn-icon btn-cancel" @click="cancelEditTableComment" :title="t('common.cancel')">✕</button>
                                     </template>
                                 </div>
                             </div>
                             <p class="table-meta">
                                 {{ state.tableSchema.row_count }} {{ t('table.rowsCount') }}
-                                <span v-if="!state.hasPrimaryKey" class="no-pk-warning">⚠️ 无主键</span>
+                                <span v-if="!state.hasPrimaryKey" class="no-pk-warning">⚠️ {{ t('dataEdit.noPrimaryKey') }}</span>
                             </p>
                         </div>
 
@@ -229,19 +235,23 @@
                                             </td>
                                             <td class="col-comment-cell">
                                                 <template v-if="state.editingColumnComment !== col.name">
-                                                    <span v-if="col.comment">{{ col.comment }}</span>
-                                                    <span v-else class="text-muted">-</span>
-                                                    <button class="btn-icon btn-tiny" @click="startEditColumnComment(col.name, col.comment)" title="编辑备注">✏️</button>
+                                                    <div class="col-comment-display">
+                                                        <span v-if="col.comment" class="col-comment-text">{{ col.comment }}</span>
+                                                        <span v-else class="col-comment-text text-muted">-</span>
+                                                        <button class="btn-icon btn-tiny" @click="startEditColumnComment(col.name, col.comment)" :title="t('dataEdit.editComment')">✏️</button>
+                                                    </div>
                                                 </template>
                                                 <template v-else>
-                                                    <input
-                                                        v-model="state.editColumnCommentValue"
-                                                        class="edit-input edit-input-small"
-                                                        @keyup.enter="saveColumnComment(col.name)"
-                                                        @keyup.escape="cancelEditColumnComment"
-                                                    />
-                                                    <button class="btn-icon btn-tiny btn-save" @click="saveColumnComment(col.name)" title="保存">✓</button>
-                                                    <button class="btn-icon btn-tiny btn-cancel" @click="cancelEditColumnComment" title="取消">✕</button>
+                                                    <div class="col-comment-edit">
+                                                        <input
+                                                            v-model="state.editColumnCommentValue"
+                                                            class="edit-input edit-input-small"
+                                                            @keyup.enter="saveColumnComment(col.name)"
+                                                            @keyup.escape="cancelEditColumnComment"
+                                                        />
+                                                        <button class="btn-icon btn-tiny btn-save" @click="saveColumnComment(col.name)" :title="t('dataEdit.save')">✓</button>
+                                                        <button class="btn-icon btn-tiny btn-cancel" @click="cancelEditColumnComment" :title="t('common.cancel')">✕</button>
+                                                    </div>
                                                 </template>
                                             </td>
                                         </tr>
@@ -256,10 +266,10 @@
                             <div class="data-toolbar">
                                 <div class="toolbar-left">
                                     <button class="btn btn-small" @click="startAddRow" :disabled="state.isAddingRow">
-                                        ➕ 新增行
+                                        ➕ {{ t('dataEdit.addRow') }}
                                     </button>
                                     <span v-if="!state.hasPrimaryKey" class="toolbar-warning">
-                                        ⚠️ 无主键，编辑/删除功能受限
+                                        ⚠️ {{ t('dataEdit.noPkEditLimit') }}
                                     </span>
                                 </div>
                                 <div class="toolbar-right">
@@ -268,7 +278,7 @@
                                         :class="{ active: state.viewMode === 'table' }"
                                         @click="switchViewMode('table')"
                                     >
-                                        📋 表格
+                                        📋 {{ t('dataEdit.tableView') }}
                                     </button>
                                     <button
                                         class="btn btn-small"
@@ -276,7 +286,7 @@
                                         @click="switchViewMode('record')"
                                         :disabled="!hasData"
                                     >
-                                        📄 逐条
+                                        📄 {{ t('dataEdit.recordView') }}
                                     </button>
                                 </div>
                             </div>
@@ -285,7 +295,7 @@
                             <template v-if="state.viewMode === 'table'">
                                 <!-- 新增行表单 -->
                                 <div v-if="state.isAddingRow && state.tableSchema && state.tableSchema.columns" class="add-row-form">
-                                    <h4>新增记录</h4>
+                                    <h4>{{ t('dataEdit.newRecord') }}</h4>
                                     <div class="add-row-fields">
                                         <div v-for="col in state.tableSchema.columns" :key="col.name" class="add-row-field">
                                             <label>{{ col.name }}</label>
@@ -297,8 +307,8 @@
                                         </div>
                                     </div>
                                     <div class="add-row-actions">
-                                        <button class="btn btn-primary btn-small" @click="saveNewRow">保存</button>
-                                        <button class="btn btn-small" @click="cancelAddRow">取消</button>
+                                        <button class="btn btn-primary btn-small" @click="saveNewRow">{{ t('dataEdit.save') }}</button>
+                                        <button class="btn btn-small" @click="cancelAddRow">{{ t('common.cancel') }}</button>
                                     </div>
                                 </div>
 
@@ -307,7 +317,7 @@
                                     <table>
                                         <thead>
                                             <tr>
-                                                <th class="action-col">操作</th>
+                                                <th class="action-col">{{ t('dataEdit.actions') }}</th>
                                                 <th v-for="col in state.tableSchema.columns" :key="col.name"
                                                     @click="sortTable(col.name)"
                                                     class="sortable">
@@ -333,18 +343,18 @@
                                                             class="btn-icon btn-tiny"
                                                             @click.stop="startEditRow(index)"
                                                             :disabled="!state.hasPrimaryKey"
-                                                            title="编辑"
+                                                            :title="t('dataEdit.edit')"
                                                         >✏️</button>
                                                         <button
                                                             class="btn-icon btn-tiny btn-danger"
                                                             @click.stop="deleteRow(index)"
                                                             :disabled="!state.hasPrimaryKey"
-                                                            title="删除"
+                                                            :title="t('dataEdit.delete')"
                                                         >🗑️</button>
                                                     </template>
                                                     <template v-else>
-                                                        <button class="btn-icon btn-tiny btn-save" @click.stop="saveEditRow" title="保存">✓</button>
-                                                        <button class="btn-icon btn-tiny btn-cancel" @click.stop="cancelEditRow" title="取消">✕</button>
+                                                        <button class="btn-icon btn-tiny btn-save" @click.stop="saveEditRow" :title="t('dataEdit.save')">✓</button>
+                                                        <button class="btn-icon btn-tiny btn-cancel" @click.stop="cancelEditRow" :title="t('common.cancel')">✕</button>
                                                     </template>
                                                 </td>
                                                 <!-- 数据列 -->
@@ -367,7 +377,7 @@
 
                                 <!-- 空数据提示 -->
                                 <div v-else class="empty-data">
-                                    <p>📭 暂无数据</p>
+                                    <p>📭 {{ t('dataEdit.noData') }}</p>
                                 </div>
                             </template>
 
@@ -377,13 +387,13 @@
                                     <!-- 记录导航 -->
                                     <div class="record-nav">
                                         <button class="btn btn-small" @click="prevRecord" :disabled="state.selectedRowIndex === 0">
-                                            ◀ 上一条
+                                            ◀ {{ t('dataEdit.prevRecord') }}
                                         </button>
                                         <span class="record-counter">
-                                            第 {{ state.selectedRowIndex + 1 }} / {{ state.tableData.length }} 条
+                                            {{ t('dataEdit.recordCounter').replace('{current}', state.selectedRowIndex + 1).replace('{total}', state.tableData.length) }}
                                         </span>
                                         <button class="btn btn-small" @click="nextRecord" :disabled="state.selectedRowIndex >= state.tableData.length - 1">
-                                            下一条 ▶
+                                            {{ t('dataEdit.nextRecord') }} ▶
                                         </button>
                                     </div>
 
@@ -421,41 +431,41 @@
                                                 @click="startEditRecord"
                                                 :disabled="!state.hasPrimaryKey"
                                             >
-                                                ✏️ 编辑
+                                                ✏️ {{ t('dataEdit.edit') }}
                                             </button>
                                             <button
                                                 class="btn btn-danger"
                                                 @click="deleteRecord"
                                                 :disabled="!state.hasPrimaryKey"
                                             >
-                                                🗑️ 删除
+                                                🗑️ {{ t('dataEdit.delete') }}
                                             </button>
                                         </template>
                                         <template v-else>
                                             <button class="btn btn-primary" @click="saveEditRecord">
-                                                ✓ 保存
+                                                ✓ {{ t('dataEdit.save') }}
                                             </button>
                                             <button class="btn" @click="cancelEditRecord">
-                                                ✕ 取消
+                                                ✕ {{ t('common.cancel') }}
                                             </button>
                                         </template>
                                         <button class="btn" @click="switchViewMode('table')">
-                                            📋 返回表格
+                                            📋 {{ t('dataEdit.returnTableView') }}
                                         </button>
                                     </div>
                                 </div>
                                 <div v-else class="empty-data">
-                                    <p>📭 暂无数据</p>
+                                    <p>📭 {{ t('dataEdit.noData') }}</p>
                                 </div>
                             </template>
 
                             <!-- 分页 -->
                             <div v-if="totalPages > 1" class="pagination">
-                                <button @click="goToPage(1)" :disabled="state.currentPageNum === 1">首页</button>
-                                <button @click="goToPage(state.currentPageNum - 1)" :disabled="state.currentPageNum === 1">上一页</button>
-                                <span>第 {{ state.currentPageNum }} / {{ totalPages }} 页</span>
-                                <button @click="goToPage(state.currentPageNum + 1)" :disabled="state.currentPageNum === totalPages">下一页</button>
-                                <button @click="goToPage(totalPages)" :disabled="state.currentPageNum === totalPages">尾页</button>
+                                <button @click="goToPage(1)" :disabled="state.currentPageNum === 1">{{ t('dataEdit.firstPage') }}</button>
+                                <button @click="goToPage(state.currentPageNum - 1)" :disabled="state.currentPageNum === 1">{{ t('dataEdit.prevPage') }}</button>
+                                <span>{{ t('dataEdit.pageInfo').replace('{current}', state.currentPageNum).replace('{total}', totalPages) }}</span>
+                                <button @click="goToPage(state.currentPageNum + 1)" :disabled="state.currentPageNum === totalPages">{{ t('dataEdit.nextPage') }}</button>
+                                <button @click="goToPage(totalPages)" :disabled="state.currentPageNum === totalPages">{{ t('dataEdit.lastPage') }}</button>
                             </div>
                         </div>
                     </div>
@@ -476,7 +486,7 @@
                         <input
                             v-model="fileBrowser.pathInput"
                             @keyup.enter="goToPath"
-                            placeholder="输入路径直接跳转..."
+                            :placeholder="t('dataEdit.inputPath')"
                         />
                         <button @click="goToPath">{{ t('file.goTo') }}</button>
                     </div>
@@ -539,7 +549,7 @@
                     </ul>
 
                     <div v-else class="file-browser-empty">
-                        <p>📂 该目录为空或没有数据库文件</p>
+                        <p>📂 {{ t('dataEdit.emptyDir') }}</p>
                     </div>
                 </div>
             </div>
