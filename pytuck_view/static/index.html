@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="/static/components.css">
 </head>
 <body>
-    <div id="app" @click="handleGlobalClick">
+    <div id="app" v-cloak @click="handleGlobalClick">
         <!-- 语言切换器(右上角) -->
         <div class="language-switcher">
             <!-- Material Design 翻译图标 -->
@@ -53,12 +53,6 @@
                 <h1>📊 pytuck-view</h1>
                 <p>{{ t('common.selectDatabaseHint') }}</p>
             </header>
-
-            <!-- 错误提示 -->
-            <div v-if="state.error" class="error">
-                ❌ {{ state.error }}
-                <button @click="state.error = null">×</button>
-            </div>
 
             <!-- 占位符功能警告 -->
             <div v-if="state.placeholderWarning" class="warning">
@@ -113,12 +107,6 @@
             <div v-if="state.placeholderWarning" class="warning">
                 ⚠️ {{ state.placeholderWarning }}
                 <button @click="state.placeholderWarning = null">×</button>
-            </div>
-
-            <!-- 错误提示（数据库页面） -->
-            <div v-if="state.error" class="error">
-                ❌ {{ state.error }}
-                <button @click="state.error = null">×</button>
             </div>
 
             <div class="main-content">
@@ -565,6 +553,12 @@
                     <button class="btn btn-primary" @click="saveTableEdit">{{ t('dataEdit.save') }}</button>
                 </div>
             </div>
+        </div>
+
+        <!-- Toast 消息提示框 -->
+        <div v-if="state.error" class="toast toast-error">
+            <div class="toast-content">{{ state.error }}</div>
+            <button class="toast-close" @click="state.error = null">×</button>
         </div>
 
         <!-- 全局加载状态 -->

@@ -629,6 +629,27 @@ function createApiClient(state) {
                 }
             }
 
+            // ========== 数据行验证 ==========
+
+            function validateRowData(data, columns, isNew = false) {
+                const errors = [];
+                for (const col of columns) {
+                    const value = data[col.name];
+                    const isEmpty = value === null || value === undefined ||
+                                   (typeof value === 'string' && value.trim() === '');
+
+                    // 主键必填（新增时）
+                    if (isNew && col.primary_key && isEmpty) {
+                        errors.push(`${col.name} (${t('dataEdit.primaryKey')}) ${t('dataEdit.fieldRequired')}`);
+                    }
+                    // 非空字段必填（排除主键，主键单独检查）
+                    if (!col.nullable && isEmpty && !col.primary_key) {
+                        errors.push(`${col.name} ${t('dataEdit.fieldRequired')}`);
+                    }
+                }
+                return errors;
+            }
+
             // ========== 数据行编辑操作 ==========
 
             function selectRow(index) {
@@ -654,6 +675,15 @@ function createApiClient(state) {
                 if (!state.hasPrimaryKey || !state.primaryKeyColumn) {
                     state.error = t('dataEdit.noPkCannotSave');
                     return;
+                }
+
+                // 验证非空字段
+                if (state.tableSchema?.columns) {
+                    const errors = validateRowData(state.editBuffer, state.tableSchema.columns, false);
+                    if (errors.length > 0) {
+                        state.error = errors.join('\n');
+                        return;
+                    }
                 }
 
                 const pkValue = state.tableData[state.editRowIndex][state.primaryKeyColumn];
@@ -726,9 +756,18 @@ function createApiClient(state) {
             async function saveNewRow() {
                 if (!state.currentDatabase || !state.currentTable) return;
 
+                // 验证必填字段（新增时包括主键）
+                if (state.tableSchema?.columns) {
+                    const errors = validateRowData(state.newRowData, state.tableSchema.columns, true);
+                    if (errors.length > 0) {
+                        state.error = errors.join('\n');
+                        return;
+                    }
+                }
+
                 try {
                     state.loading = true;
-                    state.error = null;  // 清除之前的错误
+                    state.error = null;
                     await api(`/rows/${state.currentDatabase.file_id}/${state.currentTable}`, {
                         method: 'POST',
                         body: JSON.stringify({ data: state.newRowData })
@@ -740,7 +779,6 @@ function createApiClient(state) {
                     // 重新加载表结构以更新行数
                     await loadTableSchema(state.currentTable);
                 } catch (error) {
-                    // 错误在 api 函数中已设置 state.error，这里保持在当前页面
                     state.error = `${t('dataEdit.insertFailed')}: ${error.message}`;
                 } finally {
                     state.loading = false;
@@ -797,6 +835,15 @@ function createApiClient(state) {
                 if (!state.hasPrimaryKey || !state.primaryKeyColumn) {
                     state.error = t('dataEdit.noPkCannotSave');
                     return;
+                }
+
+                // 验证非空字段
+                if (state.tableSchema?.columns) {
+                    const errors = validateRowData(state.editBuffer, state.tableSchema.columns, false);
+                    if (errors.length > 0) {
+                        state.error = errors.join('\n');
+                        return;
+                    }
                 }
 
                 const pkValue = state.tableData[state.selectedRowIndex][state.primaryKeyColumn];
