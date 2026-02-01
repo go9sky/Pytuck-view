@@ -15,8 +15,7 @@ def generate_locale_json(locale: str) -> dict[str, str]:
     translations = {}
 
     for ui_class in ALL_UI_CLASSES:
-        class_name = ui_class.__name__  # 如 "CommonUI"
-        prefix = class_name.replace("UI", "").lower()  # 如 "common"
+        prefix = ui_class.__i18n_prefix__
 
         # 遍历类属性
         for attr_name in dir(ui_class):
@@ -25,13 +24,8 @@ def generate_locale_json(locale: str) -> dict[str, str]:
 
             attr_value = getattr(ui_class, attr_name)
             if isinstance(attr_value, I18nMessage):
-                # 将大写字母转换为小写,生成 camelCase key
-                # APP_TITLE -> appTitle, BROWSE_DIRECTORY -> browseDirectory
-                key_parts = attr_name.split("_")
-                camel_name = key_parts[0].lower() + "".join(
-                    word.capitalize() for word in key_parts[1:]
-                )
-                key = f"{prefix}.{camel_name}"
+                # 直接使用 prefix.key 拼接，无任何转换
+                key = f"{prefix}.{attr_value.key}"
                 # 获取对应语言的翻译
                 translation = getattr(attr_value, locale)
                 translations[key] = translation

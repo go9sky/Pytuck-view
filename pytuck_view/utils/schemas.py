@@ -14,8 +14,12 @@ class I18nMessage(BaseModel):
     - 采用f-string模板
     - 支持多种语言标识格式（如 zh-CN, zh_cn, zh 等）
     - 未匹配则默认用中文
+    - key 字段用于前端国际化，后端使用时可不填
     """
 
+    key: str | None = Field(
+        default=None, description="前端国际化 key（不含 prefix），后端可不填"
+    )
     zh_cn: str = Field(..., description="中文消息模板")
     en_us: str = Field(..., description="英文消息模板")
 
