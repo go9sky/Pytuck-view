@@ -269,6 +269,20 @@ class DataEditUI(BaseUIClass):
         zh_cn="第 {current} / {total} 页",
         en_us="Page {current} of {total}",
     )
+    TOTAL_ROWS = I18nMessage(
+        key="totalRows",
+        zh_cn="共 {total} 条",
+        en_us="Total {total}",
+    )
+    ROWS_PER_PAGE = I18nMessage(
+        key="rowsPerPage", zh_cn="每页", en_us="Per page"
+    )
+    JUMP_TO_PAGE = I18nMessage(
+        key="jumpToPage", zh_cn="跳至", en_us="Go to"
+    )
+    PAGE_SUFFIX = I18nMessage(
+        key="pageSuffix", zh_cn="页", en_us=""
+    )
 
     # 数据状态
     NO_DATA = I18nMessage(key="noData", zh_cn="暂无数据", en_us="No data")

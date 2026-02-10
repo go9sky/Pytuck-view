@@ -769,20 +769,41 @@ body {
 /* 分页 */
 .pagination {
     display: flex;
-    justify-content: center;
+    justify-content: space-between;
     align-items: center;
     gap: 10px;
-    padding: 20px;
+    padding: 12px 0;
     flex-shrink: 0;
+    font-size: 14px;
+}
+
+.pagination-left {
+    color: #666;
+    white-space: nowrap;
+}
+
+.pagination-center {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.pagination-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #666;
+    white-space: nowrap;
 }
 
 .pagination button {
-    padding: 6px 12px;
+    padding: 4px 10px;
     border: 1px solid #ddd;
     background: white;
     cursor: pointer;
     border-radius: 4px;
     transition: all 0.2s ease;
+    font-size: 13px;
 }
 
 .pagination button:hover:not(:disabled) {
@@ -798,6 +819,24 @@ body {
 .pagination span {
     color: #666;
     font-size: 14px;
+}
+
+.pagination select {
+    padding: 4px 6px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+    background: white;
+}
+
+.pagination .jump-input {
+    width: 50px;
+    padding: 4px 6px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+    text-align: center;
 }
 
 /* 加载状态 */

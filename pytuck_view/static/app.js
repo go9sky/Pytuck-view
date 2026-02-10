@@ -221,6 +221,7 @@ function createApiClient(state) {
                 currentPageNum: 1,
                 totalRows: 0,
                 rowsPerPage: 50,
+                jumpPageInput: '',
                 loading: false,
                 error: null,
                 placeholderWarning: null,
@@ -502,6 +503,24 @@ function createApiClient(state) {
                 if (state.tableData.length > 0) {
                     state.selectedRowIndex = 0;
                 }
+            }
+
+            async function changeRowsPerPage(newSize) {
+                state.rowsPerPage = newSize;
+                state.currentPageNum = 1;
+                if (state.currentTable) {
+                    await loadTableData(state.currentTable, 1);
+                    if (state.tableData.length > 0) {
+                        state.selectedRowIndex = 0;
+                    }
+                }
+            }
+
+            function jumpToPage() {
+                var page = state.jumpPageInput;
+                if (!page || page < 1 || page > totalPages.value) return;
+                goToPage(page);
+                state.jumpPageInput = '';
             }
 
             // ========== 表/列编辑操作 ==========
@@ -1034,6 +1053,7 @@ function createApiClient(state) {
                 goToPath, goUp, goToBreadcrumb, selectAndOpenFile,
                 // 表操作
                 selectTable, switchToDataTab, sortTable, goToPage,
+                changeRowsPerPage, jumpToPage,
                 // 表/列编辑
                 startEditTableName, cancelEditTableName, saveTableName,
                 startEditTableComment, cancelEditTableComment, saveTableComment,

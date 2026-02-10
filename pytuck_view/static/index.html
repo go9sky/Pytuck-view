@@ -154,9 +154,6 @@
                                         </span>
                                         <span v-if="!state.hasPrimaryKey" class="no-pk-warning">⚠️ {{ t('dataEdit.noPrimaryKey') }}</span>
                                     </div>
-                                    <div class="table-header-meta">
-                                        {{ state.tableSchema.row_count }} {{ t('table.rowsCount') }}
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -440,11 +437,35 @@
 
                             <!-- 分页 -->
                             <div v-if="totalPages >= 1" class="pagination">
-                                <button @click="goToPage(1)" :disabled="state.currentPageNum === 1">{{ t('dataEdit.firstPage') }}</button>
-                                <button @click="goToPage(state.currentPageNum - 1)" :disabled="state.currentPageNum === 1">{{ t('dataEdit.prevPage') }}</button>
-                                <span>{{ t('dataEdit.pageInfo').replace('{current}', state.currentPageNum).replace('{total}', totalPages) }}</span>
-                                <button @click="goToPage(state.currentPageNum + 1)" :disabled="state.currentPageNum === totalPages">{{ t('dataEdit.nextPage') }}</button>
-                                <button @click="goToPage(totalPages)" :disabled="state.currentPageNum === totalPages">{{ t('dataEdit.lastPage') }}</button>
+                                <div class="pagination-left">
+                                    <span>{{ t('dataEdit.totalRows').replace('{total}', state.totalRows) }}</span>
+                                </div>
+                                <div class="pagination-center">
+                                    <button @click="goToPage(1)" :disabled="state.currentPageNum === 1">{{ t('dataEdit.firstPage') }}</button>
+                                    <button @click="goToPage(state.currentPageNum - 1)" :disabled="state.currentPageNum === 1">{{ t('dataEdit.prevPage') }}</button>
+                                    <span>{{ t('dataEdit.pageInfo').replace('{current}', state.currentPageNum).replace('{total}', totalPages) }}</span>
+                                    <button @click="goToPage(state.currentPageNum + 1)" :disabled="state.currentPageNum === totalPages">{{ t('dataEdit.nextPage') }}</button>
+                                    <button @click="goToPage(totalPages)" :disabled="state.currentPageNum === totalPages">{{ t('dataEdit.lastPage') }}</button>
+                                </div>
+                                <div class="pagination-right">
+                                    <span>{{ t('dataEdit.rowsPerPage') }}</span>
+                                    <select :value="state.rowsPerPage" @change="changeRowsPerPage(Number($event.target.value))">
+                                        <option value="20">20</option>
+                                        <option value="50">50</option>
+                                        <option value="100">100</option>
+                                        <option value="200">200</option>
+                                    </select>
+                                    <span>{{ t('dataEdit.jumpToPage') }}</span>
+                                    <input
+                                        class="jump-input"
+                                        type="number"
+                                        min="1"
+                                        :max="totalPages"
+                                        v-model.number="state.jumpPageInput"
+                                        @keyup.enter="jumpToPage"
+                                    />
+                                    <span v-if="t('dataEdit.pageSuffix')">{{ t('dataEdit.pageSuffix') }}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
