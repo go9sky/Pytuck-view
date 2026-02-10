@@ -152,7 +152,7 @@
                                         <span v-if="state.tableSchema.table_comment" class="table-comment-inline">
                                             ({{ state.tableSchema.table_comment }})
                                         </span>
-                                        <span v-if="!state.hasPrimaryKey" class="no-pk-warning">⚠️ {{ t('dataEdit.noPrimaryKey') }}</span>
+                                        <span v-if="state.isPseudoPk" class="no-pk-warning">⚠️ {{ t('dataEdit.usingInternalRowId') }}</span>
                                     </div>
                                 </div>
                             </div>
@@ -179,7 +179,7 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr v-for="col in state.tableSchema.columns" :key="col.name">
+                                        <tr v-for="col in visibleColumns" :key="col.name">
                                             <td class="col-name-cell">
                                                 {{ col.name }}
                                             </td>
@@ -229,8 +229,8 @@
                                     <button class="btn btn-small" @click="startAddRow" :disabled="state.isAddingRow">
                                         ➕ {{ t('dataEdit.addRow') }}
                                     </button>
-                                    <span v-if="!state.hasPrimaryKey" class="toolbar-warning">
-                                        ⚠️ {{ t('dataEdit.noPkEditLimit') }}
+                                    <span v-if="state.isPseudoPk" class="toolbar-warning">
+                                        ⚠️ {{ t('dataEdit.usingInternalRowId') }}
                                     </span>
                                 </div>
                                 <div class="toolbar-right">
@@ -258,7 +258,7 @@
                                 <div v-if="state.isAddingRow && state.tableSchema && state.tableSchema.columns" class="add-row-form">
                                     <h4>{{ t('dataEdit.newRecord') }}</h4>
                                     <div class="add-row-fields">
-                                        <div v-for="col in state.tableSchema.columns" :key="col.name" class="add-row-field">
+                                        <div v-for="col in visibleColumns" :key="col.name" class="add-row-field">
                                             <label>{{ col.name }}</label>
                                             <input
                                                 v-model="state.newRowData[col.name]"
@@ -279,7 +279,7 @@
                                         <thead>
                                             <tr>
                                                 <th class="action-col" :style="{ width: '70px' }">{{ t('dataEdit.actions') }}</th>
-                                                <th v-for="(col, colIndex) in state.tableSchema.columns" :key="col.name"
+                                                <th v-for="(col, colIndex) in visibleColumns" :key="col.name"
                                                     @click="sortTable(col.name)"
                                                     class="sortable"
                                                     :style="{ width: getColWidth(col.name) + 'px' }">
@@ -305,13 +305,11 @@
                                                         <button
                                                             class="btn-icon btn-tiny"
                                                             @click.stop="startEditRow(index)"
-                                                            :disabled="!state.hasPrimaryKey"
                                                             :title="t('dataEdit.edit')"
                                                         >✏️</button>
                                                         <button
                                                             class="btn-icon btn-tiny btn-danger"
                                                             @click.stop="deleteRow(index)"
-                                                            :disabled="!state.hasPrimaryKey"
                                                             :title="t('dataEdit.delete')"
                                                         >🗑️</button>
                                                     </template>
@@ -321,7 +319,7 @@
                                                     </template>
                                                 </td>
                                                 <!-- 数据列 -->
-                                                <td v-for="col in state.tableSchema.columns" :key="col.name">
+                                                <td v-for="col in visibleColumns" :key="col.name">
                                                     <template v-if="state.editRowIndex !== index">
                                                         <div class="cell-content"
                                                              :class="{ expanded: isCellExpanded(index, col.name) }"
@@ -366,7 +364,7 @@
                                     <div class="record-detail">
                                         <table class="record-table">
                                             <tbody>
-                                                <tr v-for="col in state.tableSchema.columns" :key="col.name">
+                                                <tr v-for="col in visibleColumns" :key="col.name">
                                                     <th class="record-field-name">
                                                         <div class="field-name-wrapper">
                                                             {{ col.name }}
@@ -405,14 +403,12 @@
                                             <button
                                                 class="btn btn-primary"
                                                 @click="startEditRecord"
-                                                :disabled="!state.hasPrimaryKey"
                                             >
                                                 ✏️ {{ t('dataEdit.edit') }}
                                             </button>
                                             <button
                                                 class="btn btn-danger"
                                                 @click="deleteRecord"
-                                                :disabled="!state.hasPrimaryKey"
                                             >
                                                 🗑️ {{ t('dataEdit.delete') }}
                                             </button>

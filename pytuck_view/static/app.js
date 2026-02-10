@@ -231,6 +231,7 @@ function createApiClient(state) {
                 // 编辑相关状态
                 primaryKeyColumn: null,       // 当前表的主键列名
                 hasPrimaryKey: false,         // 当前表是否有主键
+                isPseudoPk: false,            // 是否使用隐式 _pytuck_rowid
                 selectedRowIndex: null,       // 当前选中行索引
                 editRowIndex: null,           // 正在编辑的行索引
                 editBuffer: null,             // 编辑缓冲区
@@ -271,6 +272,10 @@ function createApiClient(state) {
             // ========== 计算属性 ==========
             const totalPages = computed(() => Math.ceil(state.totalRows / state.rowsPerPage));
             const hasData = computed(() => state.tableData && state.tableData.length > 0);
+            const visibleColumns = computed(() => {
+                if (!state.tableSchema || !state.tableSchema.columns) return [];
+                return state.tableSchema.columns.filter(col => col.name !== '_pytuck_rowid');
+            });
             const breadcrumbs = computed(() => utils.parseBreadcrumbs(fileBrowser.path));
             const canGoUp = computed(() => utils.canNavigateUp(fileBrowser.path));
 
@@ -435,10 +440,12 @@ function createApiClient(state) {
                     const data = await api(`/schema/${state.currentDatabase.file_id}/${tableName}/primary-key`);
                     state.primaryKeyColumn = data.primary_key;
                     state.hasPrimaryKey = data.has_primary_key;
+                    state.isPseudoPk = data.is_pseudo_pk || false;
                 } catch (error) {
                     console.error('获取主键信息失败:', error);
                     state.primaryKeyColumn = null;
                     state.hasPrimaryKey = false;
+                    state.isPseudoPk = false;
                 }
             }
 
@@ -785,10 +792,6 @@ function createApiClient(state) {
             }
 
             function startEditRow(index) {
-                if (!state.hasPrimaryKey) {
-                    state.error = t('dataEdit.noPkCannotEdit');
-                    return;
-                }
                 state.editRowIndex = index;
                 state.editBuffer = JSON.parse(JSON.stringify(state.tableData[index]));
             }
@@ -800,7 +803,7 @@ function createApiClient(state) {
 
             async function saveEditRow() {
                 if (!state.currentDatabase || !state.currentTable || state.editBuffer === null) return;
-                if (!state.hasPrimaryKey || !state.primaryKeyColumn) {
+                if (!state.primaryKeyColumn) {
                     state.error = t('dataEdit.noPkCannotSave');
                     return;
                 }
@@ -815,13 +818,16 @@ function createApiClient(state) {
                 }
 
                 const pkValue = state.tableData[state.editRowIndex][state.primaryKeyColumn];
+                // 发送前移除 _pytuck_rowid（内部字段不作为更新数据）
+                const sendData = Object.assign({}, state.editBuffer);
+                delete sendData._pytuck_rowid;
 
                 try {
                     state.loading = true;
                     state.error = null;
                     await api(`/rows/${state.currentDatabase.file_id}/${state.currentTable}`, {
                         method: 'PUT',
-                        body: JSON.stringify({ pk: pkValue, data: state.editBuffer })
+                        body: JSON.stringify({ pk: pkValue, data: sendData })
                     });
                     cancelEditRow();
                     await loadTableData(state.currentTable, state.currentPageNum);
@@ -834,7 +840,7 @@ function createApiClient(state) {
 
             async function deleteRow(index) {
                 if (!state.currentDatabase || !state.currentTable) return;
-                if (!state.hasPrimaryKey || !state.primaryKeyColumn) {
+                if (!state.primaryKeyColumn) {
                     state.error = t('dataEdit.noPkCannotDelete');
                     return;
                 }
@@ -867,6 +873,8 @@ function createApiClient(state) {
                 // 初始化默认值
                 if (state.tableSchema?.columns) {
                     state.tableSchema.columns.forEach(col => {
+                        // 跳过隐式行号字段
+                        if (col.name === '_pytuck_rowid') return;
                         if (col.default_value && col.default_value !== 'None') {
                             state.newRowData[col.name] = col.default_value;
                         } else {
@@ -944,10 +952,6 @@ function createApiClient(state) {
             }
 
             function startEditRecord() {
-                if (!state.hasPrimaryKey) {
-                    state.error = t('dataEdit.noPkCannotEdit');
-                    return;
-                }
                 if (state.selectedRowIndex === null) return;
                 state.editBuffer = JSON.parse(JSON.stringify(state.tableData[state.selectedRowIndex]));
                 state.editRowIndex = state.selectedRowIndex;
@@ -960,7 +964,7 @@ function createApiClient(state) {
 
             async function saveEditRecord() {
                 if (!state.currentDatabase || !state.currentTable || state.editBuffer === null) return;
-                if (!state.hasPrimaryKey || !state.primaryKeyColumn) {
+                if (!state.primaryKeyColumn) {
                     state.error = t('dataEdit.noPkCannotSave');
                     return;
                 }
@@ -975,13 +979,16 @@ function createApiClient(state) {
                 }
 
                 const pkValue = state.tableData[state.selectedRowIndex][state.primaryKeyColumn];
+                // 发送前移除 _pytuck_rowid（内部字段不作为更新数据）
+                const sendData = Object.assign({}, state.editBuffer);
+                delete sendData._pytuck_rowid;
 
                 try {
                     state.loading = true;
                     state.error = null;
                     await api(`/rows/${state.currentDatabase.file_id}/${state.currentTable}`, {
                         method: 'PUT',
-                        body: JSON.stringify({ pk: pkValue, data: state.editBuffer })
+                        body: JSON.stringify({ pk: pkValue, data: sendData })
                     });
                     cancelEditRecord();
                     await loadTableData(state.currentTable, state.currentPageNum);
@@ -995,7 +1002,7 @@ function createApiClient(state) {
             async function deleteRecord() {
                 if (state.selectedRowIndex === null) return;
                 if (!state.currentDatabase || !state.currentTable) return;
-                if (!state.hasPrimaryKey || !state.primaryKeyColumn) {
+                if (!state.primaryKeyColumn) {
                     state.error = t('dataEdit.noPkCannotDelete');
                     return;
                 }
@@ -1047,7 +1054,7 @@ function createApiClient(state) {
                 locale, isLoadingLocale, showLanguageMenu, t,
                 switchLocale, toggleLanguageMenu, handleGlobalClick, copyErrorMessage,
                 // 状态
-                state, fileBrowser, totalPages, hasData, breadcrumbs, canGoUp,
+                state, fileBrowser, totalPages, hasData, visibleColumns, breadcrumbs, canGoUp,
                 // 文件操作
                 openFile, removeHistory, loadRecentFiles,
                 openFileBrowser, closeFileBrowser, browseTo,

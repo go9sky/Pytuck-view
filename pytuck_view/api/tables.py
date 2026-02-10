@@ -408,12 +408,14 @@ async def get_table_primary_key(
 
     db_service = db_services[file_id]
     pk_column = db_service.get_primary_key_column(table_name)
+    is_user_pk = db_service.has_user_primary_key(table_name)
 
     return SuccessResult(
         data={
             "table_name": table_name,
             "primary_key": pk_column,
             "has_primary_key": pk_column is not None,
+            "is_pseudo_pk": not is_user_pk and pk_column is not None,
         },
         i18n_msg=None,
     )

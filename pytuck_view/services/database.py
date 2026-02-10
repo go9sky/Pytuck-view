@@ -553,21 +553,43 @@ class DatabaseService:
     def get_primary_key_column(self, table_name: str) -> str | None:
         """获取表的主键列名
 
+        无用户定义主键时返回 '_pytuck_rowid'（pytuck 隐式行号）作为后备。
+
         Args:
             table_name: 表名
 
         Returns:
-            主键列名，如果没有主键则返回 None
+            主键列名，或 '_pytuck_rowid'（隐式行号）
         """
         if not self.storage:
             raise RuntimeError("数据库未打开")
 
         try:
             table = self.storage.get_table(table_name)
-            return table.primary_key
+            # 有用户定义主键直接返回，否则用 pytuck 隐式行号兜底
+            return table.primary_key or "_pytuck_rowid"
         except Exception as e:
             logger.error(f"获取主键列失败 {table_name}: {simplify_exception(e)}")
             return None
+
+    def has_user_primary_key(self, table_name: str) -> bool:
+        """检查表是否有用户定义的主键（非隐式 _pytuck_rowid）
+
+        Args:
+            table_name: 表名
+
+        Returns:
+            True 表示有用户定义的主键，False 表示使用隐式行号
+        """
+        if not self.storage:
+            raise RuntimeError("数据库未打开")
+
+        try:
+            table = self.storage.get_table(table_name)
+            return table.primary_key is not None
+        except Exception as e:
+            logger.error(f"获取主键信息失败 {table_name}: {simplify_exception(e)}")
+            return False
 
     def rename_table(self, old_name: str, new_name: str) -> None:
         """重命名表

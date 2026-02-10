@@ -246,6 +246,11 @@ class DataEditUI(BaseUIClass):
         en_us="No primary key, edit/delete limited",
     )
     PRIMARY_KEY = I18nMessage(key="primaryKey", zh_cn="主键", en_us="Primary Key")
+    USING_INTERNAL_ROWID = I18nMessage(
+        key="usingInternalRowId",
+        zh_cn="使用内部行号",
+        en_us="Using internal row ID",
+    )
 
     # 记录视图导航
     PREV_RECORD = I18nMessage(key="prevRecord", zh_cn="上一条", en_us="Previous")
