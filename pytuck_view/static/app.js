@@ -183,6 +183,9 @@ function createApiClient(state) {
                 if (!event.target.closest('.language-switcher')) {
                     showLanguageMenu.value = false;
                 }
+                if (!event.target.closest('.column-picker-wrapper')) {
+                    state.showColumnPicker = false;
+                }
             };
 
             // 复制错误消息到剪贴板
@@ -257,7 +260,15 @@ function createApiClient(state) {
                 columnWidths: {},             // { colName: widthPx }
                 resizingColumn: null,         // 当前拖拽的列名
                 resizeStartX: 0,              // 拖拽起始X坐标
-                resizeStartWidth: 0           // 拖拽起始宽度
+                resizeStartWidth: 0,          // 拖拽起始宽度
+                // 侧边栏状态
+                sidebarCollapsed: false,      // 侧边栏是否折叠
+                sidebarWidth: 250,            // 侧边栏宽度(px)
+                showSidebarSearch: false,     // 是否显示搜索框
+                sidebarFilter: '',            // 搜索筛选文本
+                // 列可见性状态
+                hiddenColumns: {},            // { colName: true } 隐藏的列
+                showColumnPicker: false       // 是否显示列选择器
             });
 
             // ========== 文件浏览器状态 ==========
@@ -273,6 +284,24 @@ function createApiClient(state) {
             const totalPages = computed(() => Math.ceil(state.totalRows / state.rowsPerPage));
             const hasData = computed(() => state.tableData && state.tableData.length > 0);
             const visibleColumns = computed(() => {
+                if (!state.tableSchema || !state.tableSchema.columns) return [];
+                return state.tableSchema.columns.filter(col =>
+                    col.name !== '_pytuck_rowid' && !state.hiddenColumns[col.name]
+                );
+            });
+            const filteredTables = computed(() => {
+                if (!state.sidebarFilter) return state.tables;
+                var kw = state.sidebarFilter.toLowerCase();
+                return state.tables.filter(t =>
+                    t.name.toLowerCase().includes(kw) ||
+                    (t.comment && t.comment.toLowerCase().includes(kw))
+                );
+            });
+            const sidebarWidthStyle = computed(() => {
+                return state.sidebarCollapsed ? '48px' : (state.sidebarWidth + 'px');
+            });
+            // 所有列（除 _pytuck_rowid，用于列选择器面板）
+            const allUserColumns = computed(() => {
                 if (!state.tableSchema || !state.tableSchema.columns) return [];
                 return state.tableSchema.columns.filter(col => col.name !== '_pytuck_rowid');
             });
@@ -415,6 +444,7 @@ function createApiClient(state) {
                     state.newRowData = {};
                     state.expandedCells = {};
                     state.columnWidths = {};
+                    state.hiddenColumns = {};
 
                     // 并行加载表结构和数据
                     await Promise.all([
@@ -764,6 +794,57 @@ function createApiClient(state) {
                 document.addEventListener('mouseup', onMouseUp);
             }
 
+            // ========== 侧边栏操作 ==========
+
+            function toggleSidebar() {
+                state.sidebarCollapsed = !state.sidebarCollapsed;
+            }
+
+            function startSidebarResize(event) {
+                if (state.sidebarCollapsed) return;
+                var startX = event.clientX;
+                var startWidth = state.sidebarWidth;
+
+                var onMouseMove = function(e) {
+                    var diff = e.clientX - startX;
+                    state.sidebarWidth = Math.max(150, Math.min(600, startWidth + diff));
+                };
+
+                var onMouseUp = function() {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                };
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            }
+
+            function toggleSidebarSearch() {
+                state.showSidebarSearch = !state.showSidebarSearch;
+                if (!state.showSidebarSearch) {
+                    state.sidebarFilter = '';
+                } else {
+                    Vue.nextTick(() => {
+                        var input = document.querySelector('.sidebar-search-input');
+                        if (input) input.focus();
+                    });
+                }
+            }
+
+            // ========== 列可见性操作 ==========
+
+            function toggleColumnPicker() {
+                state.showColumnPicker = !state.showColumnPicker;
+            }
+
+            function toggleColumnVisibility(colName) {
+                if (state.hiddenColumns[colName]) {
+                    delete state.hiddenColumns[colName];
+                } else {
+                    state.hiddenColumns[colName] = true;
+                }
+            }
+
             // ========== 数据行验证 ==========
 
             function validateRowData(data, columns, isNew = false) {
@@ -1054,7 +1135,9 @@ function createApiClient(state) {
                 locale, isLoadingLocale, showLanguageMenu, t,
                 switchLocale, toggleLanguageMenu, handleGlobalClick, copyErrorMessage,
                 // 状态
-                state, fileBrowser, totalPages, hasData, visibleColumns, breadcrumbs, canGoUp,
+                state, fileBrowser, totalPages, hasData, visibleColumns,
+                filteredTables, sidebarWidthStyle, allUserColumns,
+                breadcrumbs, canGoUp,
                 // 文件操作
                 openFile, removeHistory, loadRecentFiles,
                 openFileBrowser, closeFileBrowser, browseTo,
@@ -1070,6 +1153,10 @@ function createApiClient(state) {
                 openTableEditModal, closeTableEditModal, saveTableEdit, deleteTable,
                 // 单元格展开/列宽拖拽
                 isCellExpanded, toggleCellExpand, getColWidth, startColResize,
+                // 侧边栏
+                toggleSidebar, startSidebarResize, toggleSidebarSearch,
+                // 列可见性
+                toggleColumnPicker, toggleColumnVisibility,
                 // 数据行编辑
                 selectRow, startEditRow, cancelEditRow, saveEditRow, deleteRow,
                 startAddRow, cancelAddRow, saveNewRow,

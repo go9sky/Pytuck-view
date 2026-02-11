@@ -359,3 +359,19 @@ class DataEditUI(BaseUIClass):
     FIELD_REQUIRED = I18nMessage(
         key="fieldRequired", zh_cn="不能为空", en_us="is required"
     )
+
+    # 列可见性
+    COLUMNS_TOGGLE = I18nMessage(
+        key="columnsToggle", zh_cn="列显示", en_us="Columns"
+    )
+
+    # 侧边栏
+    SEARCH_TABLE = I18nMessage(
+        key="searchTable", zh_cn="搜索表名...", en_us="Search tables..."
+    )
+    COLLAPSE_SIDEBAR = I18nMessage(
+        key="collapseSidebar", zh_cn="收起侧边栏", en_us="Collapse sidebar"
+    )
+    EXPAND_SIDEBAR = I18nMessage(
+        key="expandSidebar", zh_cn="展开侧边栏", en_us="Expand sidebar"
+    )

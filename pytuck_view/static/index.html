@@ -95,11 +95,11 @@
 
         <!-- 数据库查看页面 -->
         <div v-else-if="state.currentPage === 'database-view'" class="database-view">
-            <header class="header">
-                <button @click="backToFileSelector" class="btn btn-back">← {{ t('common.back') }}</button>
+            <header class="header header-compact">
+                <button @click="backToFileSelector" class="btn btn-back btn-small">← {{ t('common.back') }}</button>
                 <div class="db-info">
                     <h1>📊 {{ state.currentDatabase.name }}</h1>
-                    <p>{{ state.currentDatabase.tables_count }} {{ t('common.tablesCount') }} • {{ formatFileSize(state.currentDatabase.file_size) }}</p>
+                    <span class="db-meta">{{ state.currentDatabase.tables_count }} {{ t('common.tablesCount') }} • {{ formatFileSize(state.currentDatabase.file_size) }}</span>
                 </div>
             </header>
 
@@ -111,16 +111,33 @@
 
             <div class="main-content">
                 <!-- 侧边栏 - 表列表 -->
-                <aside class="sidebar">
-                    <h3>📋 {{ t('table.dataTables') }}</h3>
-                    <div class="table-list">
-                        <div v-for="table in state.tables" :key="table.name"
+                <aside class="sidebar" :class="{ collapsed: state.sidebarCollapsed }" :style="{ width: sidebarWidthStyle }">
+                    <div class="sidebar-header">
+                        <span v-if="!state.sidebarCollapsed" class="sidebar-title-text">📋 {{ t('table.dataTables') }}</span>
+                        <div class="sidebar-actions">
+                            <button v-if="!state.sidebarCollapsed" class="btn-icon sidebar-search-btn" @click="toggleSidebarSearch" :title="t('common.search')">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                            </button>
+                            <button class="btn-icon sidebar-toggle-btn" @click="toggleSidebar" :title="state.sidebarCollapsed ? t('dataEdit.expandSidebar') : t('dataEdit.collapseSidebar')">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                    <path v-if="!state.sidebarCollapsed" d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+                                    <path v-else d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div v-if="!state.sidebarCollapsed && state.showSidebarSearch" class="sidebar-search">
+                        <input class="sidebar-search-input" v-model="state.sidebarFilter" :placeholder="t('dataEdit.searchTable')" />
+                    </div>
+                    <div class="table-list" v-if="!state.sidebarCollapsed">
+                        <div v-for="table in filteredTables" :key="table.name"
                              class="table-item"
                              :class="{
                                 active: state.currentTable === table.name,
                                 placeholder: table.name.startsWith('⚠️') || table.name.startsWith('💡') || table.name.startsWith('📋')
                              }"
-                             @click="selectTable(table.name)">
+                             @click="selectTable(table.name)"
+                             :title="table.name + (table.comment ? ' - ' + table.comment : '')">
                             <div class="table-item-content">
                                 <div class="table-item-name">{{ table.name }}</div>
                                 <div v-if="table.comment" class="table-item-comment">{{ table.comment }}</div>
@@ -135,6 +152,9 @@
                     </div>
                 </aside>
 
+                <!-- 侧边栏拖拽手柄 -->
+                <div v-if="!state.sidebarCollapsed" class="sidebar-resize-handle" @mousedown.prevent="startSidebarResize($event)"></div>
+
                 <!-- 主内容区 -->
                 <main class="content">
                     <div v-if="!state.currentTable" class="welcome">
@@ -142,26 +162,19 @@
                     </div>
 
                     <div v-else class="content-body">
-                        <!-- 表信息 -->
-                        <div v-if="state.tableSchema" class="table-info">
-                            <div class="table-header">
-                                <!-- 表名+备注+行数 一行显示 -->
-                                <div class="table-header-row">
-                                    <div class="table-header-info">
-                                        <h2>📊 {{ state.tableSchema.table_name }}</h2>
-                                        <span v-if="state.tableSchema.table_comment" class="table-comment-inline">
-                                            ({{ state.tableSchema.table_comment }})
-                                        </span>
-                                        <span v-if="state.isPseudoPk" class="no-pk-warning">⚠️ {{ t('dataEdit.usingInternalRowId') }}</span>
-                                    </div>
-                                </div>
+                        <!-- 表名 + Tab 合并为一行 -->
+                        <div v-if="state.tableSchema" class="table-header-bar">
+                            <div class="table-header-info">
+                                <span class="table-name">📊 {{ state.tableSchema.table_name }}</span>
+                                <span v-if="state.tableSchema.table_comment" class="table-comment-inline">
+                                    ({{ state.tableSchema.table_comment }})
+                                </span>
+                                <span v-if="state.isPseudoPk" class="no-pk-warning">⚠️ {{ t('dataEdit.usingInternalRowId') }}</span>
                             </div>
-                        </div>
-
-                        <!-- Tab -->
-                        <div class="tab-bar">
-                            <button class="tab" :class="{active: state.activeTab === 'structure'}" @click="state.activeTab = 'structure'">{{ t('table.tabStructure') }}</button>
-                            <button class="tab" :class="{active: state.activeTab === 'data'}" @click="switchToDataTab">{{ t('table.tabData') }}</button>
+                            <div class="tab-bar">
+                                <button class="tab" :class="{active: state.activeTab === 'structure'}" @click="state.activeTab = 'structure'">{{ t('table.tabStructure') }}</button>
+                                <button class="tab" :class="{active: state.activeTab === 'data'}" @click="switchToDataTab">{{ t('table.tabData') }}</button>
+                            </div>
                         </div>
 
                         <!-- 结构 Tab -->
@@ -229,6 +242,17 @@
                                     <button class="btn btn-small" @click="startAddRow" :disabled="state.isAddingRow">
                                         ➕ {{ t('dataEdit.addRow') }}
                                     </button>
+                                    <div class="column-picker-wrapper">
+                                        <button class="btn btn-small" @click.stop="toggleColumnPicker" :title="t('dataEdit.columnsToggle')">
+                                            📋 {{ t('dataEdit.columnsToggle') }}
+                                        </button>
+                                        <div v-if="state.showColumnPicker" class="column-picker" @click.stop>
+                                            <label v-for="col in allUserColumns" :key="col.name" class="column-picker-item">
+                                                <input type="checkbox" :checked="!state.hiddenColumns[col.name]" @change="toggleColumnVisibility(col.name)" />
+                                                <span>{{ col.name }}</span>
+                                            </label>
+                                        </div>
+                                    </div>
                                     <span v-if="state.isPseudoPk" class="toolbar-warning">
                                         ⚠️ {{ t('dataEdit.usingInternalRowId') }}
                                     </span>
@@ -280,13 +304,14 @@
                                             <tr>
                                                 <th class="action-col" :style="{ width: '70px' }">{{ t('dataEdit.actions') }}</th>
                                                 <th v-for="(col, colIndex) in visibleColumns" :key="col.name"
-                                                    @click="sortTable(col.name)"
-                                                    class="sortable"
                                                     :style="{ width: getColWidth(col.name) + 'px' }">
-                                                    {{ col.name }}
-                                                    <span v-if="state.sortBy === col.name">
-                                                        <span v-if="state.sortOrder === 'asc'">↑</span>
-                                                        <span v-else>↓</span>
+                                                    <span class="th-label">{{ col.name }}</span>
+                                                    <span class="sort-icon" @click.stop="sortTable(col.name)" :title="'Sort by ' + col.name">
+                                                        <template v-if="state.sortBy === col.name">
+                                                            <span v-if="state.sortOrder === 'asc'">↑</span>
+                                                            <span v-else>↓</span>
+                                                        </template>
+                                                        <template v-else>⇅</template>
                                                     </span>
                                                     <span class="col-resize-handle" @mousedown.stop.prevent="startColResize($event, col.name)"></span>
                                                 </th>
