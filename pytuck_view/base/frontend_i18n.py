@@ -106,6 +106,12 @@ class FileUI(BaseUIClass):
         en_us="Please select a file to view its content",
     )
 
+    # 文件备注
+    NOTE = I18nMessage(key="note", zh_cn="备注", en_us="Note")
+    NOTE_PLACEHOLDER = I18nMessage(
+        key="notePlaceholder", zh_cn="添加备注...", en_us="Add note..."
+    )
+
     # 文件浏览器
     SELECT_DATABASE_FILE = I18nMessage(
         key="selectDatabaseFile", zh_cn="选择数据库文件", en_us="Select Database File"

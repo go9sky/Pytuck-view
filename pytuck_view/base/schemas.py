@@ -29,6 +29,7 @@ class FileRecord(BaseModel):
     last_opened: str = Field(datetime.now().isoformat(), description="最后打开时间")
     file_size: int = Field(0, description="文件大小")
     engine_name: str = Field(..., description="引擎名称")
+    note: str = Field(default="", description="用户备注")
 
 
 class ApiResponse[T](BaseModel):

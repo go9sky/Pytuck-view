@@ -5,17 +5,20 @@
 - 发现文件
 - 打开文件（本地路径）
 - 关闭文件 / 删除历史
+- 翻译文件
 
 统一前缀由 app.include_router(..., prefix="/api") 提供。
 """
 
 import asyncio
+import json
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
+from pytuck_view.base.constants import HOME_DIR
 from pytuck_view.base.exceptions import ResultWarningException, ServiceException
 from pytuck_view.base.i18n import ApiSummaryI18n, FileI18n
 from pytuck_view.base.response import ResponseUtil
@@ -246,3 +249,49 @@ async def browse_directory(
         pass  # 记录失败不影响响应
 
     return SuccessResult(data={"path": str(target), "entries": entries}, i18n_msg=None)
+
+
+# ========== 翻译文件 ==========
+
+
+@router.get(
+    "/locales/{locale}",
+    summary="获取前端翻译文件",
+)
+async def get_locale(locale: str) -> dict[str, str]:
+    """获取指定语言的翻译 JSON（不走 ResponseUtil，直接返回纯翻译对象）"""
+    # 安全校验：仅允许已知 locale，防止路径穿越
+    allowed = {"zh_cn", "en_us"}
+    if locale not in allowed:
+        raise HTTPException(status_code=404, detail="Locale not found")
+    locale_file = HOME_DIR / "locales" / f"{locale}.json"
+    if not locale_file.exists():
+        raise HTTPException(status_code=404, detail="Locale not found")
+    with open(locale_file, encoding="utf-8") as f:
+        result: dict[str, str] = json.load(f)
+    return result
+
+
+# ========== 文件备注 ==========
+
+
+class UpdateNoteBody(BaseModel):
+    """更新文件备注请求体"""
+
+    note: str
+
+
+@router.patch(
+    "/recent-files/{file_id}/note",
+    summary="更新文件备注",
+    response_model=ApiResponse[Empty],
+)
+@ResponseUtil(i18n_summary=ApiSummaryI18n.UPDATE_FILE_NOTE)
+async def update_file_note(
+    file_id: str, body: UpdateNoteBody
+) -> SuccessResult[Empty]:
+    """更新最近文件的备注信息"""
+    success = file_manager.update_note(file_id, body.note)
+    if not success:
+        raise ResultWarningException(FileI18n.HISTORY_NOT_EXISTS)
+    return SuccessResult(data=Empty(), i18n_msg=FileI18n.UPDATE_NOTE_SUCCESS)

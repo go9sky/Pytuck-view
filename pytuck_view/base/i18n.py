@@ -62,6 +62,8 @@ class ApiSummaryI18n:
 
     DROP_TABLE = I18nMessage(zh_cn="删除表", en_us="Drop table")
 
+    UPDATE_FILE_NOTE = I18nMessage(zh_cn="更新文件备注", en_us="Update file note")
+
 
 class FileI18n:
     """文件管理模块国际化"""
@@ -107,6 +109,10 @@ class FileI18n:
 
     HISTORY_NOT_EXISTS = I18nMessage(
         zh_cn="历史记录不存在", en_us="History record not exists"
+    )
+
+    UPDATE_NOTE_SUCCESS = I18nMessage(
+        zh_cn="备注更新成功", en_us="Note updated successfully"
     )
 
     GET_USER_HOME_FAILED = I18nMessage(

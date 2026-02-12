@@ -22,7 +22,7 @@ const i18n = {
                 this.loading = false;
                 return;
             }
-            const response = await fetch(`/static/locales/${locale}.json`);
+            const response = await fetch(`/api/locales/${locale}`);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const translations = await response.json();
             this.messages = translations;
@@ -317,7 +317,7 @@ function createApiClient(state) {
                     state.loading = true;
                     const data = await api('/recent-files');
                     const files = data.files || [];
-                    files.sort((a, b) => String(b.last_opened).localeCompare(String(a.last_opened)));
+                    files.sort((a, b) => String(a.path).localeCompare(String(b.path)));
                     state.recentFiles = files;
                 } catch (error) {
                     console.error('加载最近文件失败:', error);
@@ -359,6 +359,17 @@ function createApiClient(state) {
                     state.error = `${t('error.removeFailed')}: ${error.message}`;
                 } finally {
                     state.loading = false;
+                }
+            }
+
+            async function updateFileNote(fileId, note) {
+                try {
+                    await api(`/recent-files/${fileId}/note`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({ note: note })
+                    });
+                } catch (error) {
+                    state.error = `${t('error.removeFailed')}: ${error.message}`;
                 }
             }
 
@@ -1139,7 +1150,7 @@ function createApiClient(state) {
                 filteredTables, sidebarWidthStyle, allUserColumns,
                 breadcrumbs, canGoUp,
                 // 文件操作
-                openFile, removeHistory, loadRecentFiles,
+                openFile, removeHistory, loadRecentFiles, updateFileNote,
                 openFileBrowser, closeFileBrowser, browseTo,
                 goToPath, goUp, goToBreadcrumb, selectAndOpenFile,
                 // 表操作

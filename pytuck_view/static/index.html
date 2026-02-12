@@ -79,6 +79,16 @@
                             <button class="file-card-remove" :title="t('dataEdit.remove')" @click.stop="removeHistory(file.file_id)">×</button>
                         </div>
                         <div class="file-card-path">{{ file.path }}</div>
+                        <div class="file-card-note" @click.stop>
+                            <input
+                                type="text"
+                                class="file-note-input"
+                                :value="file.note || ''"
+                                :placeholder="t('file.notePlaceholder')"
+                                @blur="updateFileNote(file.file_id, $event.target.value)"
+                                @keyup.enter="$event.target.blur()"
+                            />
+                        </div>
                         <div class="file-card-meta">
                             {{ formatFileSize(file.file_size) }} • {{ formatDate(file.last_opened) }}
                         </div>
