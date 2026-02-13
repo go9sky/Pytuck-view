@@ -76,8 +76,8 @@
                                 <span class="file-card-name">{{ file.name }}</span>
                                 <span v-if="file.engine_name" class="engine-tag">{{ file.engine_name }}</span>
                             </div>
-                            <button class="file-card-convert" :title="t('convert.convertEngine')" @click.stop="openConvertModal(file)">🔄</button>
-                            <button class="file-card-remove" :title="t('dataEdit.remove')" @click.stop="removeHistory(file.file_id)">×</button>
+                            <button class="file-card-action file-card-convert" :title="t('convert.convertEngine')" @click.stop="openConvertModal(file)">⇋</button>
+                            <button class="file-card-action file-card-remove" :title="t('dataEdit.remove')" @click.stop="removeHistory(file.file_id)">×</button>
                         </div>
                         <div class="file-card-path">{{ file.path }}</div>
                         <div class="file-card-note" @click.stop>

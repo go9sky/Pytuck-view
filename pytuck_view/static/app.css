@@ -250,14 +250,14 @@ body {
     white-space: nowrap;
 }
 
-.file-card-remove {
+/* 卡片操作按钮（统一基础样式） */
+.file-card-action {
     flex-shrink: 0;
     width: 24px;
     height: 24px;
-    border-radius: 999px;
-    border: 1px solid #e5e7eb;
-    background: #fff;
-    color: #6b7280;
+    border: none;
+    background: none;
+    color: #9ca3af;
     cursor: pointer;
     font-size: 18px;
     line-height: 1;
@@ -265,12 +265,18 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    border-radius: 4px;
+    transition: color 0.2s, background 0.2s;
+}
+
+.file-card-convert:hover {
+    color: #1d4ed8;
+    background: rgba(29, 78, 216, 0.08);
 }
 
 .file-card-remove:hover {
-    border-color: #fecaca;
-    background: #fff5f5;
     color: #b91c1c;
+    background: rgba(185, 28, 28, 0.08);
 }
 
 .quick-actions {
@@ -1837,31 +1843,6 @@ body {
         opacity: 1;
         transform: translateX(0);
     }
-}
-
-/* ========== 引擎转换按钮 ========== */
-.file-card-convert {
-    flex-shrink: 0;
-    width: 24px;
-    height: 24px;
-    border-radius: 999px;
-    border: 1px solid #e5e7eb;
-    background: #fff;
-    color: #6b7280;
-    cursor: pointer;
-    font-size: 14px;
-    line-height: 1;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
-}
-
-.file-card-convert:hover {
-    border-color: #93c5fd;
-    background: #eff6ff;
-    color: #1d4ed8;
 }
 
 /* ========== 转换模态框内部样式 ========== */
