@@ -377,9 +377,7 @@ async def delete_row(
     response_model=ApiResponse[dict[str, Any]],
 )
 @ResponseUtil(i18n_summary=ApiSummaryI18n.DROP_TABLE)
-async def drop_table(
-    file_id: str, table_name: str
-) -> SuccessResult[dict[str, Any]]:
+async def drop_table(file_id: str, table_name: str) -> SuccessResult[dict[str, Any]]:
     """删除整张表（包含所有数据）"""
     if file_id not in db_services:
         raise ServiceException(DatabaseI18n.DB_NOT_OPENED)

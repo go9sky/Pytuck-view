@@ -248,11 +248,10 @@ class DatabaseService:
                 engine=engine or "binary",
                 auto_flush=False,  # 只读模式，不需要自动刷新
                 backend_options=(
-                    None if engine != 'csv'
-                    else CsvBackendOptions(
-                        field_size_limit=sys.maxsize
-                    )
-                )
+                    None
+                    if engine != "csv"
+                    else CsvBackendOptions(field_size_limit=sys.maxsize)
+                ),
             )
 
             # 创建 Session 实例

@@ -287,9 +287,7 @@ class UpdateNoteBody(BaseModel):
     response_model=ApiResponse[Empty],
 )
 @ResponseUtil(i18n_summary=ApiSummaryI18n.UPDATE_FILE_NOTE)
-async def update_file_note(
-    file_id: str, body: UpdateNoteBody
-) -> SuccessResult[Empty]:
+async def update_file_note(file_id: str, body: UpdateNoteBody) -> SuccessResult[Empty]:
     """更新最近文件的备注信息"""
     success = file_manager.update_note(file_id, body.note)
     if not success:

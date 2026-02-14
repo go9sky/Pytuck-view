@@ -282,15 +282,9 @@ class DataEditUI(BaseUIClass):
         zh_cn="共 {total} 条",
         en_us="Total {total}",
     )
-    ROWS_PER_PAGE = I18nMessage(
-        key="rowsPerPage", zh_cn="每页", en_us="Per page"
-    )
-    JUMP_TO_PAGE = I18nMessage(
-        key="jumpToPage", zh_cn="跳至", en_us="Go to"
-    )
-    PAGE_SUFFIX = I18nMessage(
-        key="pageSuffix", zh_cn="页", en_us=""
-    )
+    ROWS_PER_PAGE = I18nMessage(key="rowsPerPage", zh_cn="每页", en_us="Per page")
+    JUMP_TO_PAGE = I18nMessage(key="jumpToPage", zh_cn="跳至", en_us="Go to")
+    PAGE_SUFFIX = I18nMessage(key="pageSuffix", zh_cn="页", en_us="")
 
     # 数据状态
     NO_DATA = I18nMessage(key="noData", zh_cn="暂无数据", en_us="No data")
@@ -344,15 +338,10 @@ class DataEditUI(BaseUIClass):
     TABLE_NAME_REQUIRED = I18nMessage(
         key="tableNameRequired", zh_cn="表名不能为空", en_us="Table name is required"
     )
-    DELETE_TABLE = I18nMessage(
-        key="deleteTable", zh_cn="删除表", en_us="Delete Table"
-    )
+    DELETE_TABLE = I18nMessage(key="deleteTable", zh_cn="删除表", en_us="Delete Table")
     CONFIRM_DELETE_TABLE = I18nMessage(
         key="confirmDeleteTable",
-        zh_cn=(
-            "确定要删除表 '{name}' 吗？"
-            "此操作不可恢复，表中所有数据将被永久删除。"
-        ),
+        zh_cn=("确定要删除表 '{name}' 吗？此操作不可恢复，表中所有数据将被永久删除。"),
         en_us=(
             "Are you sure you want to delete table '{name}'? "
             "This action cannot be undone. "
@@ -364,9 +353,7 @@ class DataEditUI(BaseUIClass):
     )
 
     # 列可见性
-    COLUMNS_TOGGLE = I18nMessage(
-        key="columnsToggle", zh_cn="列显示", en_us="Columns"
-    )
+    COLUMNS_TOGGLE = I18nMessage(key="columnsToggle", zh_cn="列显示", en_us="Columns")
 
     # 侧边栏
     SEARCH_TABLE = I18nMessage(
@@ -396,9 +383,7 @@ class ConvertUI(BaseUIClass):
     START_CONVERT = I18nMessage(
         key="startConvert", zh_cn="开始转换", en_us="Start Convert"
     )
-    CONVERTING = I18nMessage(
-        key="converting", zh_cn="转换中...", en_us="Converting..."
-    )
+    CONVERTING = I18nMessage(key="converting", zh_cn="转换中...", en_us="Converting...")
     SELECT_ENGINE = I18nMessage(
         key="selectEngine", zh_cn="请选择目标引擎", en_us="Select target engine"
     )
